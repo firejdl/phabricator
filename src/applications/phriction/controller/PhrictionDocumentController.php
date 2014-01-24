@@ -332,13 +332,14 @@ final class PhrictionDocumentController
       $conn,
       'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
         ON d.contentID = c.id
-        WHERE d.slug LIKE %> AND d.depth IN (%Ld)
+        WHERE d.slug LIKE %> AND d.depth
+          '.($depth == -1 ? ' >= %d' : 'IN (%Ld)').'
           AND d.status IN (%Ld)
         ORDER BY d.depth, c.title LIMIT %d',
       $document_dao->getTableName(),
       $content_dao->getTableName(),
       ($slug == '/' ? '' : $slug),
-      range($d_child, $d_total),
+      ($depth == -1 ? $d_child : range($d_child, $d_total)),
       array(
         PhrictionDocumentStatus::STATUS_EXISTS,
         PhrictionDocumentStatus::STATUS_STUB,
