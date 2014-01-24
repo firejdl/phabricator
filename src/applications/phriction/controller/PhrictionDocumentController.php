@@ -417,7 +417,11 @@ final class PhrictionDocumentController
       ->appendChild($content);
   }
 
-  private function renderDescendents($children, $grandchildren, $current_depth) {
+  private function renderDescendents(
+    $children,
+    $grandchildren,
+    $current_depth) {
+
     $list = array();
     foreach ($children as $child) {
       if ($child['depth'] != $current_depth) {
@@ -428,7 +432,8 @@ final class PhrictionDocumentController
       $grand = idx($grandchildren, $child['slug'], array());
       if ($grand) {
         $list[] = hsprintf('<ul>');
-        $list = array_merge($list, $this->renderDescendents($grand, $grandchildren, $current_depth + 1));
+        $list = array_merge($list,
+          $this->renderDescendents($grand, $grandchildren, $current_depth + 1));
         $list[] = hsprintf('</ul>');
       }
       $list[] = hsprintf('</li>');
