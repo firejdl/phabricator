@@ -325,25 +325,44 @@ final class PhrictionDocumentController
 
     $limit = 250;
     $d_child = PhabricatorSlug::getDepth($slug) + 1;
-    $d_total = PhabricatorSlug::getDepth($slug) + $depth;
 
     // Select children and grandchildren.
-    $children = queryfx_all(
-      $conn,
-      'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
-        ON d.contentID = c.id
-        WHERE d.slug LIKE %> AND d.depth IN (%Ld)
-          AND d.status IN (%Ld)
-        ORDER BY d.depth, c.title LIMIT %d',
-      $document_dao->getTableName(),
-      $content_dao->getTableName(),
-      ($slug == '/' ? '' : $slug),
-      range($d_child, $d_total),
-      array(
-        PhrictionDocumentStatus::STATUS_EXISTS,
-        PhrictionDocumentStatus::STATUS_STUB,
-      ),
-      $limit);
+    if ($depth == -1) {
+      $children = queryfx_all(
+        $conn,
+        'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
+          ON d.contentID = c.id
+          WHERE d.slug LIKE %> AND d.depth >= %d
+            AND d.status IN (%Ld)
+          ORDER BY d.depth, c.title LIMIT %d',
+        $document_dao->getTableName(),
+        $content_dao->getTableName(),
+        ($slug == '/' ? '' : $slug),
+        $d_child,
+        array(
+          PhrictionDocumentStatus::STATUS_EXISTS,
+          PhrictionDocumentStatus::STATUS_STUB,
+        ),
+        $limit);
+    } else {
+      $d_total = PhabricatorSlug::getDepth($slug) + $depth;
+      $children = queryfx_all(
+        $conn,
+        'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
+          ON d.contentID = c.id
+          WHERE d.slug LIKE %> AND d.depth IN (%Ld)
+            AND d.status IN (%Ld)
+          ORDER BY d.depth, c.title LIMIT %d',
+        $document_dao->getTableName(),
+        $content_dao->getTableName(),
+        ($slug == '/' ? '' : $slug),
+        range($d_child, $d_total),
+        array(
+          PhrictionDocumentStatus::STATUS_EXISTS,
+          PhrictionDocumentStatus::STATUS_STUB,
+        ),
+        $limit);
+    }
 
     if (!$children) {
       return;
