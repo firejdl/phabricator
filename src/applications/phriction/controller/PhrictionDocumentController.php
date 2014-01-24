@@ -328,14 +328,15 @@ final class PhrictionDocumentController
     $d_total = PhabricatorSlug::getDepth($slug) + $depth;
 
     // Select children and grandchildren.
-    $children = queryfx_all(
-      $conn,
-      'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
+    $sql = 'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
         ON d.contentID = c.id
         WHERE d.slug LIKE %> AND d.depth
           '.($depth == -1 ? ' >= %d' : 'IN (%Ld)').'
           AND d.status IN (%Ld)
-        ORDER BY d.depth, c.title LIMIT %d',
+        ORDER BY d.depth, c.title LIMIT %d';
+    $children = queryfx_all(
+      $conn,
+      $sql,
       $document_dao->getTableName(),
       $content_dao->getTableName(),
       ($slug == '/' ? '' : $slug),
