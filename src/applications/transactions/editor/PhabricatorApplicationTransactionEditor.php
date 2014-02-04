@@ -228,6 +228,7 @@ abstract class PhabricatorApplicationTransactionEditor
   private function applyInternalEffects(
     PhabricatorLiskDAO $object,
     PhabricatorApplicationTransaction $xaction) {
+
     switch ($xaction->getTransactionType()) {
       case PhabricatorTransactions::TYPE_VIEW_POLICY:
         $object->setViewPolicy($xaction->getNewValue());
@@ -1553,6 +1554,7 @@ abstract class PhabricatorApplicationTransactionEditor
 
     $adapter = $this->buildHeraldAdapter($object, $xactions);
     $adapter->setContentSource($this->getContentSource());
+    $adapter->setIsNewObject($this->getIsNewObject());
     $xscript = HeraldEngine::loadAndApplyRules($adapter);
 
     $this->setHeraldAdapter($adapter);
