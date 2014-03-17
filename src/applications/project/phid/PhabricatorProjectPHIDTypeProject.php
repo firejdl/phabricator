@@ -12,6 +12,10 @@ final class PhabricatorProjectPHIDTypeProject extends PhabricatorPHIDType {
     return pht('Project');
   }
 
+  public function getTypeIcon() {
+    return 'policy-project';
+  }
+
   public function newObject() {
     return new PhabricatorProject();
   }
@@ -21,7 +25,8 @@ final class PhabricatorProjectPHIDTypeProject extends PhabricatorPHIDType {
     array $phids) {
 
     return id(new PhabricatorProjectQuery())
-      ->withPHIDs($phids);
+      ->withPHIDs($phids)
+      ->needImages(true);
   }
 
   public function loadHandles(
@@ -38,6 +43,11 @@ final class PhabricatorProjectPHIDTypeProject extends PhabricatorPHIDType {
       $handle->setName($name);
       $handle->setObjectName('#'.rtrim($project->getPhrictionSlug(), '/'));
       $handle->setURI("/project/view/{$id}/");
+      $handle->setImageURI($project->getProfileImageURI());
+
+      if ($project->isArchived()) {
+        $handle->setStatus(PhabricatorObjectHandleStatus::STATUS_CLOSED);
+      }
     }
   }
 

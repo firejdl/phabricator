@@ -215,6 +215,26 @@ abstract class PhabricatorBaseEnglishTranslation
         'Actions With No Effect',
       ),
 
+      'Some of your %d action(s) have no effect:' => array(
+        'One of your actions has no effect:',
+        'Some of your actions have no effect:',
+      ),
+
+      'Apply remaining %d action(s)?' => array(
+        'Apply remaining action?',
+        'Apply remaining actions?',
+      ),
+
+      'Apply %d Other Action(s)' => array(
+        'Apply Remaining Action',
+        'Apply Remaining Actions',
+      ),
+
+      'The %d action(s) you are taking have no effect:' => array(
+        'The action you are taking has no effect:',
+        'The actions you are taking have no effect:',
+      ),
+
       '%s edited post(s), added %d: %s; removed %d: %s.' =>
         '%s edited posts, added: %3$s; removed: %5$s',
 
@@ -521,6 +541,11 @@ abstract class PhabricatorBaseEnglishTranslation
         ),
       ),
 
+      '%d other(s)' => array(
+        '1 other',
+        '%d others',
+      ),
+
       '%s edited subscriber(s), added %d: %s; removed %d: %s.' =>
         '%s edited subscribers, added: %3$s; removed: %5$s',
 
@@ -824,6 +849,16 @@ abstract class PhabricatorBaseEnglishTranslation
         'Warning: there are %d signatures already for this document. '.
         'Updating the title or text will invalidate these signatures and '.
         'users will need to sign again. Proceed carefully.',
+      ),
+
+      '%s older changes(s) are hidden.' => array(
+        '%d older change is hidden.',
+        '%d older changes are hidden.',
+      ),
+
+      '%s, %d line(s)' => array(
+        '%s, %d line',
+        '%s, %d lines',
       ),
 
     );

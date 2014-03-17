@@ -57,8 +57,13 @@ final class PhabricatorAuthRegisterController
 
     $default_username = $account->getUsername();
     $default_realname = $account->getRealName();
+
     $default_email = $account->getEmail();
-    if ($default_email) {
+    if (!PhabricatorUserEmail::isValidAddress($default_email)) {
+      $default_email = null;
+    }
+
+    if ($default_email !== null) {
       // If the account source provided an email, but it's not allowed by
       // the configuration, roadblock the user. Previously, we let the user
       // pick a valid email address instead, but this does not align well with
@@ -84,7 +89,7 @@ final class PhabricatorAuthRegisterController
       // TODO: See T3340.
       // TODO: See T3472.
 
-      if ($default_email) {
+      if ($default_email !== null) {
         $same_email = id(new PhabricatorUserEmail())->loadOneWhere(
           'address = %s',
           $default_email);
@@ -125,6 +130,12 @@ final class PhabricatorAuthRegisterController
 
     $can_edit_anything = $profile->getCanEditAnything() || $must_set_password;
     $force_verify = $profile->getShouldVerifyEmail();
+
+    // Automatically verify the administrator's email address during first-time
+    // setup.
+    if ($is_setup) {
+      $force_verify = true;
+    }
 
     $value_username = $default_username;
     $value_realname = $default_realname;
@@ -200,8 +211,11 @@ final class PhabricatorAuthRegisterController
         if (!strlen($value_email)) {
           $e_email = pht('Required');
           $errors[] = pht('Email is required.');
-        } else if (!PhabricatorUserEmail::isAllowedAddress($value_email)) {
+        } else if (!PhabricatorUserEmail::isValidAddress($value_email)) {
           $e_email = pht('Invalid');
+          $errors[] = PhabricatorUserEmail::describeValidAddresses();
+        } else if (!PhabricatorUserEmail::isAllowedAddress($value_email)) {
+          $e_email = pht('Disallowed');
           $errors[] = PhabricatorUserEmail::describeAllowedAddresses();
         } else {
           $e_email = null;

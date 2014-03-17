@@ -48,9 +48,9 @@ final class PhabricatorCalendarEvent
   public function getTerseSummary(PhabricatorUser $viewer) {
     $until = phabricator_date($this->dateTo, $viewer);
     if ($this->status == PhabricatorCalendarEvent::STATUS_SPORADIC) {
-      return 'Sporadic until '.$until;
+      return pht('Sporadic until %s', $until);
     } else {
-      return 'Away until '.$until;
+      return pht('Away until %s', $until);
     }
   }
 
@@ -73,7 +73,7 @@ final class PhabricatorCalendarEvent
 
   /**
    * Validates data and throws exceptions for non-sensical status
-   * windows and attempts to create an overlapping status.
+   * windows
    */
   public function save() {
 
@@ -81,28 +81,7 @@ final class PhabricatorCalendarEvent
       throw new PhabricatorCalendarEventInvalidEpochException();
     }
 
-    $this->openTransaction();
-    $this->beginWriteLocking();
-
-    if ($this->shouldInsertWhenSaved()) {
-
-      $overlap = $this->loadAllWhere(
-        'userPHID = %s AND dateFrom < %d AND dateTo > %d',
-        $this->getUserPHID(),
-        $this->getDateTo(),
-        $this->getDateFrom());
-
-      if ($overlap) {
-        $this->endWriteLocking();
-        $this->killTransaction();
-        throw new PhabricatorCalendarEventOverlapException();
-      }
-    }
-
-    parent::save();
-
-    $this->endWriteLocking();
-    return $this->saveTransaction();
+    return parent::save();
   }
 
 

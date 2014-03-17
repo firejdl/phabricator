@@ -39,12 +39,12 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
         self::FIELD_REPOSITORY_PROJECTS,
         self::FIELD_PUSHER,
         self::FIELD_PUSHER_PROJECTS,
+        self::FIELD_PUSHER_IS_COMMITTER,
         self::FIELD_DIFFERENTIAL_REVISION,
         self::FIELD_DIFFERENTIAL_ACCEPTED,
         self::FIELD_DIFFERENTIAL_REVIEWERS,
         self::FIELD_DIFFERENTIAL_CCS,
         self::FIELD_IS_MERGE_COMMIT,
-        self::FIELD_RULE,
       ),
       parent::getFields());
   }
@@ -117,6 +117,9 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
         return $revision->getCCPHIDs();
       case self::FIELD_IS_MERGE_COMMIT:
         return $this->getIsMergeCommit();
+      case self::FIELD_PUSHER_IS_COMMITTER:
+        $pusher_phid = $this->getHookEngine()->getViewer()->getPHID();
+        return ($this->getCommitterPHID() == $pusher_phid);
     }
 
     return parent::getHeraldField($field);
@@ -203,18 +206,15 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
     switch ($vcs) {
       case PhabricatorRepositoryType::REPOSITORY_TYPE_GIT:
       case PhabricatorRepositoryType::REPOSITORY_TYPE_MERCURIAL:
-        // Here, if there's no committer, we're going to return the author
-        // instead.
+        // If there's no committer information, we're going to return the
+        // author instead. However, if there's committer information and we
+        // can't resolve it, return `null`.
         $ref = $this->getCommitRef();
         $committer = $ref->getCommitter();
         if (!strlen($committer)) {
           return $this->getAuthorPHID();
         }
-        $phid = $this->lookupUser($committer);
-        if (!$phid) {
-          return $this->getAuthorPHID();
-        }
-        return $phid;
+        return $this->lookupUser($committer);
       case PhabricatorRepositoryType::REPOSITORY_TYPE_SVN:
         // In Subversion, the pusher is always the committer.
         return $this->getHookEngine()->getViewer()->getPHID();

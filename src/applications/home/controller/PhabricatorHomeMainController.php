@@ -33,9 +33,21 @@ final class PhabricatorHomeMainController
 
   private function buildMainResponse($nav, array $projects) {
     assert_instances_of($projects, 'PhabricatorProject');
+    $viewer = $this->getRequest()->getUser();
 
-    $maniphest = 'PhabricatorApplicationManiphest';
-    if (PhabricatorApplication::isClassInstalled($maniphest)) {
+    $has_maniphest = PhabricatorApplication::isClassInstalledForViewer(
+      'PhabricatorApplicationManiphest',
+      $viewer);
+
+    $has_audit = PhabricatorApplication::isClassInstalledForViewer(
+      'PhabricatorApplicationAudit',
+      $viewer);
+
+    $has_differential = PhabricatorApplication::isClassInstalledForViewer(
+      'PhabricatorApplicationDifferential',
+      $viewer);
+
+    if ($has_maniphest) {
       $unbreak_panel = $this->buildUnbreakNowPanel();
       $triage_panel = $this->buildNeedsTriagePanel($projects);
       $tasks_panel = $this->buildTasksPanel();
@@ -45,8 +57,7 @@ final class PhabricatorHomeMainController
       $tasks_panel = null;
     }
 
-    $audit = 'PhabricatorApplicationAudit';
-    if (PhabricatorApplication::isClassInstalled($audit)) {
+    if ($has_audit) {
       $audit_panel = $this->buildAuditPanel();
       $commit_panel = $this->buildCommitPanel();
     } else {
@@ -61,7 +72,12 @@ final class PhabricatorHomeMainController
     }
 
     $jump_panel = $this->buildJumpPanel();
-    $revision_panel = $this->buildRevisionPanel();
+
+    if ($has_differential) {
+      $revision_panel = $this->buildRevisionPanel();
+    } else {
+      $revision_panel = null;
+    }
 
     $content = array(
       $jump_panel,
@@ -75,8 +91,10 @@ final class PhabricatorHomeMainController
       $this->minipanels,
     );
 
+    $user = $this->getRequest()->getUser();
     $nav->appendChild($content);
-    $nav->appendChild(new PhabricatorGlobalUploadTargetView());
+    $nav->appendChild(id(new PhabricatorGlobalUploadTargetView())
+      ->setUser($user));
 
     return $this->buildApplicationPage(
       $nav,
@@ -118,7 +136,7 @@ final class PhabricatorHomeMainController
 
     $task_query = id(new ManiphestTaskQuery())
       ->setViewer($user)
-      ->withStatuses(array(ManiphestTaskStatus::STATUS_OPEN))
+      ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
       ->withPriorities(array($unbreak_now))
       ->setLimit(10);
 
@@ -157,7 +175,7 @@ final class PhabricatorHomeMainController
     if ($projects) {
       $task_query = id(new ManiphestTaskQuery())
         ->setViewer($user)
-        ->withStatuses(array(ManiphestTaskStatus::STATUS_OPEN))
+        ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
         ->withPriorities(array($needs_triage))
         ->withAnyProjects(mpull($projects, 'getPHID'))
         ->setLimit(10);
@@ -193,7 +211,9 @@ final class PhabricatorHomeMainController
       ->setViewer($user)
       ->withStatus(DifferentialRevisionQuery::STATUS_OPEN)
       ->withResponsibleUsers(array($user_phid))
-      ->needRelationships(true);
+      ->needRelationships(true)
+      ->needFlags(true)
+      ->needDrafts(true);
 
     $revisions = $revision_query->execute();
 
@@ -215,9 +235,7 @@ final class PhabricatorHomeMainController
     $revision_view = id(new DifferentialRevisionListView())
       ->setHighlightAge(true)
       ->setRevisions(array_merge($blocking, $active))
-      ->setFields(DifferentialRevisionListView::getDefaultFields($user))
-      ->setUser($user)
-      ->loadAssets();
+      ->setUser($user);
     $phids = array_merge(
       array($user_phid),
       $revision_view->getRequiredHandlePHIDs());
@@ -250,7 +268,7 @@ final class PhabricatorHomeMainController
 
     $task_query = id(new ManiphestTaskQuery())
       ->setViewer($user)
-      ->withStatus(ManiphestTaskQuery::STATUS_OPEN)
+      ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
       ->setGroupBy(ManiphestTaskQuery::GROUP_PRIORITY)
       ->withOwners(array($user_phid))
       ->setLimit(10);

@@ -73,9 +73,6 @@ final class PhabricatorCalendarEventEditController
           ->save();
       } catch (PhabricatorCalendarEventInvalidEpochException $e) {
         $errors[] = pht('Start must be before end.');
-      } catch (PhabricatorCalendarEventOverlapException $e) {
-        $errors[] = pht('There is already a status within the specified '.
-                    'timeframe. Edit or delete this existing status.');
       }
 
       if (!$errors) {
@@ -166,6 +163,8 @@ final class PhabricatorCalendarEventEditController
     }
     $form->appendChild($submit);
 
+
+
     $form_box = id(new PHUIObjectBoxView())
       ->setHeaderText($page_title)
       ->setFormErrors($errors)
@@ -174,8 +173,13 @@ final class PhabricatorCalendarEventEditController
     $nav = $this->buildSideNavView($status);
     $nav->selectFilter($filter);
 
+    $crumbs = $this
+      ->buildApplicationCrumbs()
+      ->addTextCrumb($page_title);
+
     $nav->appendChild(
       array(
+        $crumbs,
         $form_box,
       ));
 

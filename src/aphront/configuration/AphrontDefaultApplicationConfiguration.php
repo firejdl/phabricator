@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * NOTE: Do not extend this!
+ *
+ * @concrete-extensible
  * @group aphront
  */
 class AphrontDefaultApplicationConfiguration
@@ -16,53 +19,13 @@ class AphrontDefaultApplicationConfiguration
 
   public function getURIMap() {
     return $this->getResourceURIMapRules() + array(
-      '/typeahead/' => array(
-        'common/(?P<type>\w+)/'
-          => 'PhabricatorTypeaheadCommonDatasourceController',
-      ),
-
-      '/oauthserver/' => array(
-        'auth/'          => 'PhabricatorOAuthServerAuthController',
-        'test/'          => 'PhabricatorOAuthServerTestController',
-        'token/'         => 'PhabricatorOAuthServerTokenController',
-        'clientauthorization/' => array(
-          '' => 'PhabricatorOAuthClientAuthorizationListController',
-          'delete/(?P<phid>[^/]+)/' =>
-            'PhabricatorOAuthClientAuthorizationDeleteController',
-          'edit/(?P<phid>[^/]+)/' =>
-            'PhabricatorOAuthClientAuthorizationEditController',
-        ),
-        'client/' => array(
-          ''                        => 'PhabricatorOAuthClientListController',
-          'create/'                 => 'PhabricatorOAuthClientEditController',
-          'delete/(?P<phid>[^/]+)/' => 'PhabricatorOAuthClientDeleteController',
-          'edit/(?P<phid>[^/]+)/'   => 'PhabricatorOAuthClientEditController',
-          'view/(?P<phid>[^/]+)/'   => 'PhabricatorOAuthClientViewController',
-        ),
-      ),
-
       '/~/' => array(
         '' => 'DarkConsoleController',
         'data/(?P<key>[^/]+)/' => 'DarkConsoleDataController',
       ),
-
-      '/status/' => 'PhabricatorStatusController',
-
-
       '/help/' => array(
         'keyboardshortcut/' => 'PhabricatorHelpKeyboardShortcutController',
       ),
-
-      '/notification/' => array(
-        '(?:(?P<filter>all|unread)/)?'
-          => 'PhabricatorNotificationListController',
-        'panel/' => 'PhabricatorNotificationPanelController',
-        'individual/' => 'PhabricatorNotificationIndividualController',
-        'status/' => 'PhabricatorNotificationStatusController',
-        'clear/' => 'PhabricatorNotificationClearController',
-      ),
-
-      '/debug/' => 'PhabricatorDebugController',
     );
   }
 
@@ -72,7 +35,7 @@ class AphrontDefaultApplicationConfiguration
         '(?:(?P<mtime>[0-9]+)T/)?'.
         '(?P<library>[^/]+)/'.
         '(?P<hash>[a-f0-9]{8})/'.
-        '(?P<path>.+\.(?:css|js|jpg|png|swf|gif))'
+        '(?P<path>.+\.(?:css|js|jpg|png|swf|gif|woff))'
           => 'CelerityPhabricatorResourceController',
       ),
     );
