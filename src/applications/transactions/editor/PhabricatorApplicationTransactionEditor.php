@@ -103,7 +103,7 @@ abstract class PhabricatorApplicationTransactionEditor
     return $this->parentMessageID;
   }
 
-  protected function getIsNewObject() {
+  public function getIsNewObject() {
     return $this->isNewObject;
   }
 
@@ -1721,6 +1721,12 @@ abstract class PhabricatorApplicationTransactionEditor
     $mail_tags = $this->getMailTags($object, $xactions);
     $action = $this->getMailAction($object, $xactions);
 
+    $reply_handler = $this->buildReplyHandler($object);
+    $reply_section = $reply_handler->getReplyHandlerInstructions();
+    if ($reply_section !== null) {
+      $body->addReplySection($reply_section);
+    }
+
     $template
       ->setFrom($this->requireActor()->getPHID())
       ->setSubjectPrefix($this->getMailSubjectPrefix())
@@ -1755,9 +1761,7 @@ abstract class PhabricatorApplicationTransactionEditor
       $template->setParentMessageID($this->getParentMessageID());
     }
 
-    $mails = $this
-      ->buildReplyHandler($object)
-      ->multiplexMail(
+    $mails = $reply_handler->multiplexMail(
         $template,
         array_select_keys($handles, $email_to),
         array_select_keys($handles, $email_cc));
@@ -1886,6 +1890,21 @@ abstract class PhabricatorApplicationTransactionEditor
 
     foreach ($comments as $comment) {
       $body->addRawSection($comment);
+    }
+
+    if ($object instanceof PhabricatorCustomFieldInterface) {
+      $field_list = PhabricatorCustomField::getObjectFields(
+        $object,
+        PhabricatorCustomField::ROLE_TRANSACTIONMAIL);
+      $field_list->setViewer($this->getActor());
+      $field_list->readFieldsFromStorage($object);
+
+      foreach ($field_list->getFields() as $field) {
+        $field->updateTransactionMailBody(
+          $body,
+          $this,
+          $xactions);
+      }
     }
 
     return $body;

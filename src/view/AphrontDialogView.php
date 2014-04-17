@@ -3,6 +3,7 @@
 final class AphrontDialogView extends AphrontView {
 
   private $title;
+  private $shortTitle;
   private $submitButton;
   private $cancelURI;
   private $cancelText = 'Cancel';
@@ -18,6 +19,7 @@ final class AphrontDialogView extends AphrontView {
   private $disableWorkflowOnSubmit;
   private $disableWorkflowOnCancel;
   private $width      = 'default';
+  private $errors;
 
   const WIDTH_DEFAULT = 'default';
   const WIDTH_FORM    = 'form';
@@ -30,6 +32,11 @@ final class AphrontDialogView extends AphrontView {
 
   public function setIsStandalone($is_standalone) {
     $this->isStandalone = $is_standalone;
+    return $this;
+  }
+
+  public function setErrors(array $errors) {
+    $this->errors = $errors;
     return $this;
   }
 
@@ -49,6 +56,15 @@ final class AphrontDialogView extends AphrontView {
 
   public function getTitle() {
     return $this->title;
+  }
+
+  public function setShortTitle($short_title) {
+    $this->shortTitle = $short_title;
+    return $this;
+  }
+
+  public function getShortTitle() {
+    return $this->shortTitle;
   }
 
   public function addSubmitButton($text = null) {
@@ -241,6 +257,12 @@ final class AphrontDialogView extends AphrontView {
     }
 
     $children = $this->renderChildren();
+
+    if ($this->errors) {
+      $children = array(
+        id(new AphrontErrorView())->setErrors($this->errors),
+        $children);
+    }
 
     $header = new PhabricatorActionHeaderView();
     $header->setHeaderTitle($this->title);

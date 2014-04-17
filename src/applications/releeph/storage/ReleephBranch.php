@@ -162,6 +162,10 @@ final class ReleephBranch extends ReleephDAO
     return $this->assertAttached($this->project);
   }
 
+  public function getProduct() {
+    return $this->getProject();
+  }
+
   public function attachCutPointCommit(
     PhabricatorRepositoryCommit $commit = null) {
     $this->cutPointCommit = $commit;
@@ -177,19 +181,21 @@ final class ReleephBranch extends ReleephDAO
 
 
   public function getCapabilities() {
-    return $this->getProject()->getCapabilities();
+    return $this->getProduct()->getCapabilities();
   }
 
   public function getPolicy($capability) {
-    return $this->getProject()->getPolicy($capability);
+    return $this->getProduct()->getPolicy($capability);
   }
 
   public function hasAutomaticCapability($capability, PhabricatorUser $viewer) {
-    return $this->getProject()->hasAutomaticCapability($capability, $viewer);
+    return $this->getProduct()->hasAutomaticCapability($capability, $viewer);
   }
 
   public function describeAutomaticCapability($capability) {
-    return null;
+    return pht(
+      'Release branches have the same policies as the product they are a '.
+      'part of.');
   }
 
 
