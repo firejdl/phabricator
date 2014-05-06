@@ -2,7 +2,9 @@
 
 abstract class PhabricatorApplicationTransaction
   extends PhabricatorLiskDAO
-  implements PhabricatorPolicyInterface {
+  implements
+    PhabricatorPolicyInterface,
+    PhabricatorDestructableInterface {
 
   const TARGET_TEXT = 'text';
   const TARGET_HTML = 'html';
@@ -246,6 +248,10 @@ abstract class PhabricatorApplicationTransaction
         break;
     }
 
+    if ($this->getComment()) {
+      $phids[] = array($this->getComment()->getAuthorPHID());
+    }
+
     return array_mergev($phids);
   }
 
@@ -334,6 +340,10 @@ abstract class PhabricatorApplicationTransaction
   public function getIcon() {
     switch ($this->getTransactionType()) {
       case PhabricatorTransactions::TYPE_COMMENT:
+        $comment = $this->getComment();
+        if ($comment && $comment->getIsRemoved()) {
+          return 'fa-eraser';
+        }
         return 'fa-comment';
       case PhabricatorTransactions::TYPE_SUBSCRIBERS:
         return 'fa-envelope';
@@ -374,6 +384,12 @@ abstract class PhabricatorApplicationTransaction
 
   public function getColor() {
     switch ($this->getTransactionType()) {
+      case PhabricatorTransactions::TYPE_COMMENT;
+        $comment = $this->getComment();
+        if ($comment && $comment->getIsRemoved()) {
+          return 'black';
+        }
+        break;
       case PhabricatorTransactions::TYPE_BUILDABLE:
         switch ($this->getNewValue()) {
           case HarbormasterBuildable::STATUS_PASSED:
@@ -820,7 +836,10 @@ abstract class PhabricatorApplicationTransaction
         break;
     }
 
-    return $this->renderTextCorpusChangeDetails();
+    return $this->renderTextCorpusChangeDetails(
+      $viewer,
+      $this->getOldValue(),
+      $this->getNewValue());
   }
 
   public function renderTextCorpusChangeDetails(
@@ -939,6 +958,34 @@ abstract class PhabricatorApplicationTransaction
   public function describeAutomaticCapability($capability) {
     // TODO: (T603) Exact policies are unclear here.
     return null;
+  }
+
+
+/* -(  PhabricatorDestructableInterface  )----------------------------------- */
+
+
+  public function destroyObjectPermanently(
+    PhabricatorDestructionEngine $engine) {
+
+    $this->openTransaction();
+      $comment_template = null;
+      try {
+        $comment_template = $this->getApplicationTransactionCommentObject();
+      } catch (Exception $ex) {
+        // Continue; no comments for these transactions.
+      }
+
+      if ($comment_template) {
+        $comments = $comment_template->loadAllWhere(
+          'transactionPHID = %s',
+          $this->getPHID());
+        foreach ($comments as $comment) {
+          $engine->destroyObject($comment);
+        }
+      }
+
+      $this->delete();
+    $this->saveTransaction();
   }
 
 
