@@ -4,10 +4,12 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
 
   private $lintCommit;
   private $lintMessages;
+  private $coverage;
 
   public function processRequest() {
     $request = $this->getRequest();
     $drequest = $this->getDiffusionRequest();
+    $viewer = $request->getUser();
 
     $before = $request->getStr('before');
     if ($before) {
@@ -16,7 +18,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
 
     $path = $drequest->getPath();
 
-    $preferences = $request->getUser()->loadPreferences();
+    $preferences = $viewer->loadPreferences();
 
     $show_blame = $request->getBool(
       'blame',
@@ -30,7 +32,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
         true));
 
     $view = $request->getStr('view');
-    if ($request->isFormPost() && $view != 'raw') {
+    if ($request->isFormPost() && $view != 'raw' && $viewer->isLoggedIn()) {
       $preferences->setPreference(
         PhabricatorUserPreferences::PREFERENCE_DIFFUSION_BLAME,
         $show_blame);
@@ -68,6 +70,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
     }
 
     $this->loadLintMessages();
+    $this->coverage = $drequest->loadCoverage();
 
     $binary_uri = null;
     if (ArcanistDiffUtils::isHeuristicBinaryFile($data)) {
@@ -352,7 +355,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
         ->setHref($base_uri->alter('blame', $blame_value))
         ->setIcon($blame_icon)
         ->setUser($viewer)
-        ->setRenderAsForm(true));
+        ->setRenderAsForm($viewer->isLoggedIn()));
 
     if ($show_color) {
       $highlight_text = pht('Disable Highlighting');
@@ -370,7 +373,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
         ->setHref($base_uri->alter('color', $highlight_value))
         ->setIcon($highlight_icon)
         ->setUser($viewer)
-        ->setRenderAsForm(true));
+        ->setRenderAsForm($viewer->isLoggedIn()));
 
     $href = null;
     if ($this->getRequest()->getStr('lint') !== null) {
@@ -411,6 +414,7 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
 
     $callsign = $repository->getCallsign();
     $editor_link = $user->loadEditorLink($path, $line, $callsign);
+    $template = $user->loadEditorLink($path, '%l', $callsign);
 
     $icon_edit = id(new PHUIIconView())
       ->setIconFont('fa-pencil');
@@ -419,6 +423,8 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
       ->setText(pht('Open in Editor'))
       ->setHref($editor_link)
       ->setIcon($icon_edit)
+      ->setID('editor_link')
+      ->setMetadata(array('link_template' => $template))
       ->setDisabled(!$editor_link);
 
     return $button;
@@ -625,7 +631,8 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
 
     $rows = $this->renderInlines(
       idx($inlines, 0, array()),
-      ($show_blame),
+      $show_blame,
+      (bool)$this->coverage,
       $engine);
 
     foreach ($display as $line) {
@@ -789,6 +796,24 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
           phutil_safe_html(str_replace("\t", '  ', $line['data'])),
         ));
 
+      if ($this->coverage) {
+        require_celerity_resource('differential-changeset-view-css');
+        $cov_index = $line['line'] - 1;
+
+        if (isset($this->coverage[$cov_index])) {
+          $cov_class = $this->coverage[$cov_index];
+        } else {
+          $cov_class = 'N';
+        }
+
+        $blame[] = phutil_tag(
+          'td',
+          array(
+            'class' => 'cov cov-'.$cov_class,
+          ),
+          '');
+      }
+
       $rows[] = phutil_tag(
         'tr',
         array(
@@ -800,7 +825,8 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
 
       $cur_inlines = $this->renderInlines(
         idx($inlines, $line['line'], array()),
-        ($show_blame),
+        $show_blame,
+        $this->coverage,
         $engine);
       foreach ($cur_inlines as $cur_inline) {
         $rows[] = $cur_inline;
@@ -810,17 +836,34 @@ final class DiffusionBrowseFileController extends DiffusionBrowseController {
     return $rows;
   }
 
-  private function renderInlines(array $inlines, $needs_blame, $engine) {
+  private function renderInlines(
+    array $inlines,
+    $needs_blame,
+    $has_coverage,
+    $engine) {
+
     $rows = array();
     foreach ($inlines as $inline) {
       $inline_view = id(new DifferentialInlineCommentView())
         ->setMarkupEngine($engine)
         ->setInlineComment($inline)
         ->render();
-      $row = array_fill(0, ($needs_blame ? 5 : 1), phutil_tag('th'));
+
+      $row = array_fill(0, ($needs_blame ? 3 : 1), phutil_tag('th'));
+
       $row[] = phutil_tag('td', array(), $inline_view);
+
+      if ($has_coverage) {
+        $row[] = phutil_tag(
+          'td',
+          array(
+            'class' => 'cov cov-I',
+          ));
+      }
+
       $rows[] = phutil_tag('tr', array('class' => 'inline'), $row);
     }
+
     return $rows;
   }
 

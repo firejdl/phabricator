@@ -30,7 +30,6 @@ $sheets = array(
   'remarkup' => $generator->buildRemarkupSheet(),
   'menu' => $generator->buildMenuSheet(),
   'apps' => $generator->buildAppsSheet(),
-  'actions' => $generator->buildActionsSheet(),
   'minicons' => $generator->buildMiniconsSheet(),
   'conpherence' => $generator->buildConpherenceSheet(),
   'apps-large' => $generator->buildAppsLargeSheet(),
@@ -41,7 +40,6 @@ $sheets = array(
   'gradient' => $generator->buildGradientSheet(),
   'main-header' => $generator->buildMainHeaderSheet(),
   'login' => $generator->buildLoginSheet(),
-  'status' => $generator->buildStatusSheet(),
   'projects' => $generator->buildProjectsSheet(),
 );
 

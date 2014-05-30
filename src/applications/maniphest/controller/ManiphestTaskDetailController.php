@@ -205,20 +205,6 @@ final class ManiphestTaskDetailController extends ManiphestController {
       $draft_text = null;
     }
 
-    $submit_control = id(new PHUIFormMultiSubmitControl());
-    if (!$task->isClosed()) {
-      $close_image = id(new PHUIIconView())
-          ->setIconFont('fa-check-square-o');
-      $submit_control->addButtonView(
-        id(new PHUIButtonView())
-          ->setColor(PHUIButtonView::GREY)
-          ->setIcon($close_image)
-          ->setText(pht('Close Task'))
-          ->setName('scuttle')
-          ->addSigil('alternate-submit-button'));
-    }
-    $submit_control->addSubmitButton(pht('Submit'));
-
     $comment_form = new AphrontFormView();
     $comment_form
       ->setUser($user)
@@ -284,7 +270,9 @@ final class ManiphestTaskDetailController extends ManiphestController {
           ->setValue($draft_text)
           ->setID('transaction-comments')
           ->setUser($user))
-      ->appendChild($submit_control);
+      ->appendChild(
+        id(new AphrontFormSubmitControl())
+          ->setValue(pht('Submit')));
 
     $control_map = array(
       ManiphestTransaction::TYPE_STATUS   => 'resolution',
@@ -482,8 +470,8 @@ final class ManiphestTaskDetailController extends ManiphestController {
 
     $view->addAction(
       id(new PhabricatorActionView())
-        ->setName(pht('Edit Dependencies'))
-        ->setHref("/search/attach/{$phid}/TASK/dependencies/")
+        ->setName(pht('Edit Blocking Tasks'))
+        ->setHref("/search/attach/{$phid}/TASK/blocks/")
         ->setWorkflow(true)
         ->setIcon('fa-link')
         ->setDisabled(!$can_edit)
@@ -605,9 +593,9 @@ final class ManiphestTaskDetailController extends ManiphestController {
 
     $edge_types = array(
       PhabricatorEdgeConfig::TYPE_TASK_DEPENDED_ON_BY_TASK
-      => pht('Dependent Tasks'),
+      => pht('Blocks'),
       PhabricatorEdgeConfig::TYPE_TASK_DEPENDS_ON_TASK
-      => pht('Depends On'),
+      => pht('Blocked By'),
       PhabricatorEdgeConfig::TYPE_TASK_HAS_RELATED_DREV
       => pht('Differential Revisions'),
       PhabricatorEdgeConfig::TYPE_TASK_HAS_MOCK

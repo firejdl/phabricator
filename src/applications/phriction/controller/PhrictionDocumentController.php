@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group phriction
- */
 final class PhrictionDocumentController
   extends PhrictionController {
 
@@ -115,18 +112,45 @@ final class PhrictionDocumentController
         $core_content = $notice->render();
       } else if ($current_status == PhrictionChangeType::CHANGE_MOVE_AWAY) {
         $new_doc_id = $content->getChangeRef();
-        $new_doc = new PhrictionDocument();
-        $new_doc->load($new_doc_id);
 
-        $slug_uri = PhrictionDocument::getSlugURI($new_doc->getSlug());
+        $slug_uri = null;
+
+        // If the new document exists and the viewer can see it, provide a link
+        // to it. Otherwise, render a generic message.
+        $new_docs = id(new PhrictionDocumentQuery())
+          ->setViewer($user)
+          ->withIDs(array($new_doc_id))
+          ->execute();
+        if ($new_docs) {
+          $new_doc = head($new_docs);
+          $slug_uri = PhrictionDocument::getSlugURI($new_doc->getSlug());
+        }
 
         $notice = new AphrontErrorView();
         $notice->setSeverity(AphrontErrorView::SEVERITY_NOTICE);
         $notice->setTitle(pht('Document Moved'));
-        $notice->appendChild(phutil_tag('p', array(),
-          pht('This document has been moved to %s. You can edit it to put new '.
-          'content here, or use history to revert to an earlier version.',
-            phutil_tag('a', array('href' => $slug_uri), $slug_uri))));
+
+        if ($slug_uri) {
+          $notice->appendChild(
+            phutil_tag(
+              'p',
+              array(),
+              pht(
+                'This document has been moved to %s. You can edit it to put '.
+                'new content here, or use history to revert to an earlier '.
+                'version.',
+                phutil_tag('a', array('href' => $slug_uri), $slug_uri))));
+        } else {
+          $notice->appendChild(
+            phutil_tag(
+              'p',
+              array(),
+              pht(
+                'This document has been moved. You can edit it to put new '.
+                'contne here, or use history to revert to an earlier '.
+                'version.')));
+        }
+
         $core_content = $notice->render();
       } else {
         throw new Exception("Unknown document status '{$doc_status}'!");
@@ -135,7 +159,10 @@ final class PhrictionDocumentController
       $move_notice = null;
       if ($current_status == PhrictionChangeType::CHANGE_MOVE_HERE) {
         $from_doc_id = $content->getChangeRef();
-        $from_doc = id(new PhrictionDocument())->load($from_doc_id);
+        $from_doc = id(new PhrictionDocumentQuery())
+          ->setViewer($user)
+          ->withIDs(array($from_doc_id))
+          ->executeOne();
         $slug_uri = PhrictionDocument::getSlugURI($from_doc->getSlug());
 
         $move_notice = id(new AphrontErrorView())

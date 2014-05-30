@@ -41,14 +41,21 @@ final class PhabricatorDashboardPanelViewController
     $rendered_panel = id(new PhabricatorDashboardPanelRenderingEngine())
       ->setViewer($viewer)
       ->setPanel($panel)
+      ->setParentPanelPHIDs(array())
       ->renderPanel();
+
+    $view = id(new PHUIBoxView())
+      ->addMargin(PHUI::MARGIN_LARGE_LEFT)
+      ->addMargin(PHUI::MARGIN_LARGE_RIGHT)
+      ->addMargin(PHUI::MARGIN_LARGE_TOP)
+      ->appendChild($rendered_panel);
 
     return $this->buildApplicationPage(
       array(
         $crumbs,
         $box,
+        $view,
         $timeline,
-        $rendered_panel,
       ),
       array(
         'title' => $title,
@@ -149,6 +156,7 @@ final class PhabricatorDashboardPanelViewController
 
     $timeline = id(new PhabricatorApplicationTransactionView())
       ->setUser($viewer)
+      ->setShouldTerminate(true)
       ->setObjectPHID($panel->getPHID())
       ->setTransactions($xactions);
 
