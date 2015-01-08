@@ -121,7 +121,7 @@ final class DifferentialRevisionLandController extends DifferentialController {
     $can_push = PhabricatorPolicyFilter::hasCapability(
       $request->getUser(),
       $repository,
-      DiffusionCapabilityPush::CAPABILITY);
+      DiffusionPushCapability::CAPABILITY);
 
     if (!$can_push) {
       throw new Exception(
@@ -141,6 +141,15 @@ final class DifferentialRevisionLandController extends DifferentialController {
     }
 
     $lock->unlock();
+
+    $looksoon = new ConduitCall(
+      'diffusion.looksoon',
+      array(
+        'callsigns' => array($repository->getCallsign()),
+      ));
+    $looksoon->setUser($request->getUser());
+    $looksoon->execute();
+
     return $response;
   }
 
@@ -150,4 +159,5 @@ final class DifferentialRevisionLandController extends DifferentialController {
     $lock->lock();
     return $lock;
   }
+
 }

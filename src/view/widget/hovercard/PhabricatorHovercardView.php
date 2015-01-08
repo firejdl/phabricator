@@ -73,7 +73,7 @@ final class PhabricatorHovercardView extends AphrontView {
       $handle->getTypeName(),
       $this->title ? $this->title : $handle->getName());
 
-    $header = new PhabricatorActionHeaderView();
+    $header = new PHUIActionHeaderView();
     $header->setHeaderColor($this->color);
     $header->setHeaderTitle($title);
     if ($this->tags) {
@@ -108,21 +108,22 @@ final class PhabricatorHovercardView extends AphrontView {
       $body = phutil_tag(
         'div',
         array(
-          'class' => 'phabricator-hovercard-body-image'),
-          phutil_tag(
-            'div',
-            array(
-              'class' => 'profile-header-picture-frame',
-              'style' => 'background-image: url('.$handle->getImageURI().');',
-            ),
-            ''))
-        ->appendHTML(
-          phutil_tag(
-            'div',
-            array(
-              'class' => 'phabricator-hovercard-body-details',
-            ),
-            $body));
+          'class' => 'phabricator-hovercard-body-image',
+        ),
+        phutil_tag(
+          'div',
+          array(
+            'class' => 'profile-header-picture-frame',
+            'style' => 'background-image: url('.$handle->getImageURI().');',
+          ),
+          ''))
+      ->appendHTML(
+        phutil_tag(
+          'div',
+          array(
+            'class' => 'phabricator-hovercard-body-details',
+          ),
+          $body));
     }
 
     $buttons = array();
@@ -158,7 +159,7 @@ final class PhabricatorHovercardView extends AphrontView {
       'phabricator-hovercard-container',
       array(
         phutil_tag_div('phabricator-hovercard-head', $header),
-        phutil_tag_div('phabricator-hovercard-body', $body),
+        phutil_tag_div('phabricator-hovercard-body grouped', $body),
         $tail,
       ));
 

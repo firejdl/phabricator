@@ -99,7 +99,7 @@ final class DifferentialRevisionQuery
   }
 
   /**
-   * Filter results to revisions with comments authored bythe given PHIDs
+   * Filter results to revisions with comments authored by the given PHIDs.
    *
    * @param array List of PHIDs of authors
    * @return this
@@ -155,7 +155,7 @@ final class DifferentialRevisionQuery
 
   /**
    * Filter results to revisions with a given status. Provide a class constant,
-   * such as ##DifferentialRevisionQuery::STATUS_OPEN##.
+   * such as `DifferentialRevisionQuery::STATUS_OPEN`.
    *
    * @param const Class STATUS constant, like STATUS_OPEN.
    * @return this
@@ -241,7 +241,7 @@ final class DifferentialRevisionQuery
 
   /**
    * Set result ordering. Provide a class constant, such as
-   * ##DifferentialRevisionQuery::ORDER_CREATED##.
+   * `DifferentialRevisionQuery::ORDER_CREATED`.
    *
    * @task config
    */
@@ -628,7 +628,7 @@ final class DifferentialRevisionQuery
         'AND e_ccs.type = %s '.
         'AND e_ccs.dst in (%Ls)',
         PhabricatorEdgeConfig::TABLE_NAME_EDGE,
-        PhabricatorEdgeConfig::TYPE_OBJECT_HAS_SUBSCRIBER,
+        PhabricatorObjectHasSubscriberEdgeType::EDGECONST,
         $this->ccs);
     }
 
@@ -639,7 +639,7 @@ final class DifferentialRevisionQuery
         'AND e_reviewers.type = %s '.
         'AND e_reviewers.dst in (%Ls)',
         PhabricatorEdgeConfig::TABLE_NAME_EDGE,
-        PhabricatorEdgeConfig::TYPE_DREV_HAS_REVIEWER,
+        DifferentialRevisionHasReviewerEdgeType::EDGECONST,
         $this->reviewers);
     }
 
@@ -749,7 +749,7 @@ final class DifferentialRevisionQuery
           $conn_r,
           'r.status IN (%Ld)',
           array(
-               ArcanistDifferentialRevisionStatus::NEEDS_REVIEW,
+            ArcanistDifferentialRevisionStatus::NEEDS_REVIEW,
           ));
         break;
       case self::STATUS_NEEDS_REVISION:
@@ -757,7 +757,7 @@ final class DifferentialRevisionQuery
           $conn_r,
           'r.status IN (%Ld)',
           array(
-               ArcanistDifferentialRevisionStatus::NEEDS_REVISION,
+            ArcanistDifferentialRevisionStatus::NEEDS_REVISION,
           ));
         break;
       case self::STATUS_ACCEPTED:
@@ -900,8 +900,8 @@ final class DifferentialRevisionQuery
   private function loadRelationships($conn_r, array $revisions) {
     assert_instances_of($revisions, 'DifferentialRevision');
 
-    $type_reviewer = PhabricatorEdgeConfig::TYPE_DREV_HAS_REVIEWER;
-    $type_subscriber = PhabricatorEdgeConfig::TYPE_OBJECT_HAS_SUBSCRIBER;
+    $type_reviewer = DifferentialRevisionHasReviewerEdgeType::EDGECONST;
+    $type_subscriber = PhabricatorObjectHasSubscriberEdgeType::EDGECONST;
 
     $edges = id(new PhabricatorEdgeQuery())
       ->withSourcePHIDs(mpull($revisions, 'getPHID'))
@@ -1019,7 +1019,7 @@ final class DifferentialRevisionQuery
     array $revisions) {
 
     assert_instances_of($revisions, 'DifferentialRevision');
-    $edge_type = PhabricatorEdgeConfig::TYPE_DREV_HAS_REVIEWER;
+    $edge_type = DifferentialRevisionHasReviewerEdgeType::EDGECONST;
 
     $edges = id(new PhabricatorEdgeQuery())
       ->withSourcePHIDs(mpull($revisions, 'getPHID'))
@@ -1068,7 +1068,6 @@ final class DifferentialRevisionQuery
 
       $revision->attachReviewerStatus($reviewers);
     }
-
   }
 
 
@@ -1125,8 +1124,8 @@ final class DifferentialRevisionQuery
 
     // Find all the project reviewers which the user may have authority over.
     $project_phids = array();
-    $project_type = PhabricatorProjectPHIDTypeProject::TYPECONST;
-    $edge_type = PhabricatorEdgeConfig::TYPE_DREV_HAS_REVIEWER;
+    $project_type = PhabricatorProjectProjectPHIDType::TYPECONST;
+    $edge_type = DifferentialRevisionHasReviewerEdgeType::EDGECONST;
     foreach ($edges as $src => $types) {
       if (!$allow_self) {
         if ($revision_map[$src]->getAuthorPHID() == $viewer_phid) {
@@ -1164,7 +1163,7 @@ final class DifferentialRevisionQuery
   }
 
   public function getQueryApplicationClass() {
-    return 'PhabricatorApplicationDifferential';
+    return 'PhabricatorDifferentialApplication';
   }
 
 }

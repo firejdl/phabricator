@@ -85,6 +85,7 @@ final class ReleephProductEditController extends ReleephProductController {
       }
 
       $product
+        ->setName($product_name)
         ->setTrunkBranch($trunk_branch)
         ->setDetail('pushers', $pusher_phids)
         ->setDetail('pick_failure_instructions', $pick_failure_instructions)
@@ -194,7 +195,7 @@ final class ReleephProductEditController extends ReleephProductController {
         id(new AphrontFormTokenizerControl())
           ->setLabel(pht('Pushers'))
           ->setName('pushers')
-          ->setDatasource('/typeahead/common/users/')
+          ->setDatasource(new PhabricatorPeopleDatasource())
           ->setValue($pusher_handles))
       ->appendChild($branch_template_input)
       ->appendChild($branch_template_preview)

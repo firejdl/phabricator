@@ -16,10 +16,20 @@ final class DiffusionMirrorEditController
     $drequest = $this->diffusionRequest;
     $repository = $drequest->getRepository();
 
+    PhabricatorPolicyFilter::requireCapability(
+      $viewer,
+      $repository,
+      PhabricatorPolicyCapability::CAN_EDIT);
+
     if ($this->id) {
       $mirror = id(new PhabricatorRepositoryMirrorQuery())
         ->setViewer($viewer)
         ->withIDs(array($this->id))
+        ->requireCapabilities(
+          array(
+            PhabricatorPolicyCapability::CAN_VIEW,
+            PhabricatorPolicyCapability::CAN_EDIT,
+          ))
         ->executeOne();
       if (!$mirror) {
         return new Aphront404Response();
@@ -49,7 +59,13 @@ final class DiffusionMirrorEditController
     if ($request->isFormPost()) {
       $v_remote = $request->getStr('remoteURI');
       if (strlen($v_remote)) {
-        $e_remote = null;
+        try {
+          PhabricatorRepository::assertValidRemoteURI($v_remote);
+          $e_remote = null;
+        } catch (Exception $ex) {
+          $e_remote = pht('Invalid');
+          $errors[] = $ex->getMessage();
+        }
       } else {
         $e_remote = pht('Required');
         $errors[] = pht('You must provide a remote URI.');

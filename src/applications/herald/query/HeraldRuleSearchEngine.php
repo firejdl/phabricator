@@ -1,10 +1,13 @@
 <?php
 
-final class HeraldRuleSearchEngine
-  extends PhabricatorApplicationSearchEngine {
+final class HeraldRuleSearchEngine extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationHerald';
+  public function getResultTypeDescription() {
+    return pht('Herald Rules');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorHeraldApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -67,7 +70,7 @@ final class HeraldRuleSearchEngine
     $form
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/users/')
+          ->setDatasource(new PhabricatorPeopleDatasource())
           ->setName('authors')
           ->setLabel(pht('Authors'))
           ->setValue($author_handles))
@@ -100,7 +103,7 @@ final class HeraldRuleSearchEngine
     return '/herald/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
+  protected function getBuiltinQueryNames() {
     $names = array();
 
     if ($this->requireViewer()->isLoggedIn()) {
@@ -114,7 +117,6 @@ final class HeraldRuleSearchEngine
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 
@@ -159,6 +161,7 @@ final class HeraldRuleSearchEngine
   protected function getRequiredHandlePHIDsForResultList(
     array $rules,
     PhabricatorSavedQuery $query) {
+
     return mpull($rules, 'getAuthorPHID');
   }
 

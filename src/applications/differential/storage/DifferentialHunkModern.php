@@ -14,6 +14,7 @@ final class DifferentialHunkModern extends DifferentialHunk {
   protected $data;
 
   private $rawData;
+  private $forcedEncoding;
 
   public function getTableName() {
     return 'differential_hunk_modern';
@@ -23,6 +24,23 @@ final class DifferentialHunkModern extends DifferentialHunk {
     return array(
       self::CONFIG_BINARY => array(
         'data' => true,
+      ),
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'dataType' => 'bytes4',
+        'dataEncoding' => 'text16?',
+        'dataFormat' => 'bytes4',
+        'oldOffset' => 'uint32',
+        'oldLen' => 'uint32',
+        'newOffset' => 'uint32',
+        'newLen' => 'uint32',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_changeset' => array(
+          'columns' => array('changesetID'),
+        ),
+        'key_created' => array(
+          'columns' => array('dateCreated'),
+        ),
       ),
     ) + parent::getConfiguration();
   }
@@ -41,7 +59,12 @@ final class DifferentialHunkModern extends DifferentialHunk {
   public function getChanges() {
     return $this->getUTF8StringFromStorage(
       $this->getRawData(),
-      $this->getDataEncoding());
+      nonempty($this->forcedEncoding, $this->getDataEncoding()));
+  }
+
+  public function forceEncoding($encoding) {
+    $this->forcedEncoding = $encoding;
+    return $this;
   }
 
   public function save() {

@@ -3,8 +3,12 @@
 final class PhabricatorMacroSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationMacro';
+  public function getResultTypeDescription() {
+    return pht('Macros');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorMacroApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -25,6 +29,7 @@ final class PhabricatorMacroSearchEngine
 
   public function buildQueryFromSavedQuery(PhabricatorSavedQuery $saved) {
     $query = id(new PhabricatorMacroQuery())
+      ->needFiles(true)
       ->withIDs($saved->getParameter('ids', array()))
       ->withPHIDs($saved->getParameter('phids', array()))
       ->withAuthorPHIDs($saved->getParameter('authorPHIDs', array()));
@@ -89,7 +94,7 @@ final class PhabricatorMacroSearchEngine
           ->setValue($status))
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/users/')
+          ->setDatasource(new PhabricatorPeopleDatasource())
           ->setName('authors')
           ->setLabel(pht('Authors'))
           ->setValue($author_handles))
@@ -123,7 +128,7 @@ final class PhabricatorMacroSearchEngine
     return '/macro/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
+  protected function getBuiltinQueryNames() {
     $names = array(
       'active'  => pht('Active'),
       'all'     => pht('All'),
@@ -137,7 +142,6 @@ final class PhabricatorMacroSearchEngine
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 
@@ -205,12 +209,8 @@ final class PhabricatorMacroSearchEngine
       }
 
       $item->setURI($this->getApplicationURI('/view/'.$macro->getID().'/'));
-
-      $name = $macro->getName();
-      if ($macro->getIsDisabled()) {
-        $name = pht('%s (Disabled)', $name);
-      }
-      $item->setHeader($name);
+      $item->setDisabled($macro->getisDisabled());
+      $item->setHeader($macro->getName());
 
       $pinboard->addItem($item);
     }

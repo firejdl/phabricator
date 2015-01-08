@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group pholio
- */
 final class PholioMockQuery
   extends PhabricatorCursorPagedPolicyAwareQuery {
 
@@ -71,7 +68,7 @@ final class PholioMockQuery
     $mocks = $table->loadAllFromArray($data);
 
     if ($mocks && $this->needImages) {
-      $this->loadImages($mocks);
+      self::loadImages($this->getViewer(), $mocks, $this->needInlineComments);
     }
 
     if ($mocks && $this->needCoverFiles) {
@@ -121,15 +118,18 @@ final class PholioMockQuery
     return $this->formatWhereClause($where);
   }
 
-  private function loadImages(array $mocks) {
+  public static function loadImages(
+    PhabricatorUser $viewer,
+    array $mocks,
+    $need_inline_comments) {
     assert_instances_of($mocks, 'PholioMock');
 
     $mock_map = mpull($mocks, null, 'getID');
     $all_images = id(new PholioImageQuery())
-      ->setViewer($this->getViewer())
+      ->setViewer($viewer)
       ->setMockCache($mock_map)
       ->withMockIDs(array_keys($mock_map))
-      ->needInlineComments($this->needInlineComments)
+      ->needInlineComments($need_inline_comments)
       ->execute();
 
     $image_groups = mgroup($all_images, 'getMockID');
@@ -175,7 +175,7 @@ final class PholioMockQuery
   }
 
   public function getQueryApplicationClass() {
-    return 'PhabricatorApplicationPholio';
+    return 'PhabricatorPholioApplication';
   }
 
 }

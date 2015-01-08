@@ -2,11 +2,12 @@
 
 final class PhabricatorProject extends PhabricatorProjectDAO
   implements
+    PhabricatorApplicationTransactionInterface,
     PhabricatorFlaggableInterface,
     PhabricatorPolicyInterface,
     PhabricatorSubscribableInterface,
     PhabricatorCustomFieldInterface,
-    PhabricatorDestructableInterface {
+    PhabricatorDestructibleInterface {
 
   protected $name;
   protected $status = PhabricatorProjectStatus::STATUS_ACTIVE;
@@ -15,10 +16,12 @@ final class PhabricatorProject extends PhabricatorProjectDAO
   protected $phrictionSlug;
   protected $profileImagePHID;
   protected $icon;
+  protected $color;
 
   protected $viewPolicy;
   protected $editPolicy;
   protected $joinPolicy;
+  protected $isMembershipLocked;
 
   private $memberPHIDs = self::ATTACHABLE;
   private $watcherPHIDs = self::ATTACHABLE;
@@ -29,16 +32,34 @@ final class PhabricatorProject extends PhabricatorProjectDAO
   private $slugs = self::ATTACHABLE;
 
   const DEFAULT_ICON = 'fa-briefcase';
+  const DEFAULT_COLOR = 'blue';
+
+  const TABLE_DATASOURCE_TOKEN = 'project_datasourcetoken';
 
   public static function initializeNewProject(PhabricatorUser $actor) {
+    $app = id(new PhabricatorApplicationQuery())
+      ->setViewer(PhabricatorUser::getOmnipotentUser())
+      ->withClasses(array('PhabricatorProjectApplication'))
+      ->executeOne();
+
+    $view_policy = $app->getPolicy(
+      ProjectDefaultViewCapability::CAPABILITY);
+    $edit_policy = $app->getPolicy(
+      ProjectDefaultEditCapability::CAPABILITY);
+    $join_policy = $app->getPolicy(
+      ProjectDefaultJoinCapability::CAPABILITY);
+
     return id(new PhabricatorProject())
       ->setName('')
       ->setAuthorPHID($actor->getPHID())
       ->setIcon(self::DEFAULT_ICON)
-      ->setViewPolicy(PhabricatorPolicies::POLICY_USER)
-      ->setEditPolicy(PhabricatorPolicies::POLICY_USER)
-      ->setJoinPolicy(PhabricatorPolicies::POLICY_USER)
-      ->attachMemberPHIDs(array());
+      ->setColor(self::DEFAULT_COLOR)
+      ->setViewPolicy($view_policy)
+      ->setEditPolicy($edit_policy)
+      ->setJoinPolicy($join_policy)
+      ->setIsMembershipLocked(0)
+      ->attachMemberPHIDs(array())
+      ->attachSlugs(array());
   }
 
   public function getCapabilities() {
@@ -114,12 +135,48 @@ final class PhabricatorProject extends PhabricatorProjectDAO
       self::CONFIG_SERIALIZATION => array(
         'subprojectPHIDs' => self::SERIALIZATION_JSON,
       ),
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'name' => 'sort128',
+        'status' => 'text32',
+        'phrictionSlug' => 'text128?',
+        'isMembershipLocked' => 'bool',
+        'profileImagePHID' => 'phid?',
+        'icon' => 'text32',
+        'color' => 'text32',
+
+        // T6203/NULLABILITY
+        // These are definitely wrong and should always exist.
+        'editPolicy' => 'policy?',
+        'viewPolicy' => 'policy?',
+        'joinPolicy' => 'policy?',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_phid' => null,
+        'phid' => array(
+          'columns' => array('phid'),
+          'unique' => true,
+        ),
+        'key_icon' => array(
+          'columns' => array('icon'),
+        ),
+        'key_color' => array(
+          'columns' => array('color'),
+        ),
+        'phrictionSlug' => array(
+          'columns' => array('phrictionSlug'),
+          'unique' => true,
+        ),
+        'name' => array(
+          'columns' => array('name'),
+          'unique' => true,
+        ),
+      ),
     ) + parent::getConfiguration();
   }
 
   public function generatePHID() {
     return PhabricatorPHID::generateNewPHID(
-      PhabricatorProjectPHIDTypeProject::TYPECONST);
+      PhabricatorProjectProjectPHIDType::TYPECONST);
   }
 
   public function attachMemberPHIDs(array $phids) {
@@ -208,6 +265,61 @@ final class PhabricatorProject extends PhabricatorProjectDAO
     return $this->assertAttached($this->slugs);
   }
 
+  public function getColor() {
+    if ($this->isArchived()) {
+      return PHUITagView::COLOR_DISABLED;
+    }
+
+    return $this->color;
+  }
+
+  public function save() {
+    $this->openTransaction();
+      $result = parent::save();
+      $this->updateDatasourceTokens();
+    $this->saveTransaction();
+
+    return $result;
+  }
+
+  public function updateDatasourceTokens() {
+    $table = self::TABLE_DATASOURCE_TOKEN;
+    $conn_w = $this->establishConnection('w');
+    $id = $this->getID();
+
+    $slugs = queryfx_all(
+      $conn_w,
+      'SELECT * FROM %T WHERE projectPHID = %s',
+      id(new PhabricatorProjectSlug())->getTableName(),
+      $this->getPHID());
+
+    $all_strings = ipull($slugs, 'slug');
+    $all_strings[] = $this->getName();
+    $all_strings = implode(' ', $all_strings);
+
+    $tokens = PhabricatorTypeaheadDatasource::tokenizeString($all_strings);
+
+    $sql = array();
+    foreach ($tokens as $token) {
+      $sql[] = qsprintf($conn_w, '(%d, %s)', $id, $token);
+    }
+
+    $this->openTransaction();
+      queryfx(
+        $conn_w,
+        'DELETE FROM %T WHERE projectID = %d',
+        $table,
+        $id);
+
+      foreach (PhabricatorLiskDAO::chunkSQL($sql) as $chunk) {
+        queryfx(
+          $conn_w,
+          'INSERT INTO %T (projectID, token) VALUES %Q',
+          $table,
+          $chunk);
+      }
+    $this->saveTransaction();
+  }
 
 
 /* -(  PhabricatorSubscribableInterface  )----------------------------------- */
@@ -248,7 +360,30 @@ final class PhabricatorProject extends PhabricatorProjectDAO
   }
 
 
-/* -(  PhabricatorDestructableInterface  )----------------------------------- */
+/* -(  PhabricatorApplicationTransactionInterface  )------------------------- */
+
+
+  public function getApplicationTransactionEditor() {
+    return new PhabricatorProjectTransactionEditor();
+  }
+
+  public function getApplicationTransactionObject() {
+    return $this;
+  }
+
+  public function getApplicationTransactionTemplate() {
+    return new PhabricatorProjectTransaction();
+  }
+
+  public function willRenderTimeline(
+    PhabricatorApplicationTransactionView $timeline,
+    AphrontRequest $request) {
+
+    return $timeline;
+  }
+
+
+/* -(  PhabricatorDestructibleInterface  )----------------------------------- */
 
   public function destroyObjectPermanently(
     PhabricatorDestructionEngine $engine) {

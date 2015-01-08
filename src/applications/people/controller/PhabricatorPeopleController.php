@@ -18,7 +18,7 @@ abstract class PhabricatorPeopleController extends PhabricatorController {
 
     if ($viewer->getIsAdmin()) {
       $nav->addLabel(pht('User Administration'));
-      if (PhabricatorAuthProviderLDAP::getLDAPProvider()) {
+      if (PhabricatorLDAPAuthProvider::getLDAPProvider()) {
         $nav->addFilter('ldap', pht('Import from LDAP'));
       }
 
@@ -28,11 +28,11 @@ abstract class PhabricatorPeopleController extends PhabricatorController {
     return $nav;
   }
 
-  public function buildApplicationMenu() {
+  protected function buildApplicationMenu() {
     return $this->buildSideNavView()->getMenu();
   }
 
-  public function buildApplicationCrumbs() {
+  protected function buildApplicationCrumbs() {
     $crumbs = parent::buildApplicationCrumbs();
 
     $viewer = $this->getRequest()->getUser();

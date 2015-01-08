@@ -82,10 +82,11 @@ final class PhragmentVersionController extends PhragmentController {
         $crumbs,
         $this->renderConfigurationWarningIfRequired(),
         $box,
-        $this->renderPreviousVersionList($version)),
+        $this->renderPreviousVersionList($version),
+      ),
       array(
         'title' => pht('View Version'),
-        'device' => true));
+      ));
   }
 
   private function renderPreviousVersionList(

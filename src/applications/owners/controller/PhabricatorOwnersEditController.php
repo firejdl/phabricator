@@ -92,7 +92,7 @@ final class PhabricatorOwnersEditController
           $package->save();
           return id(new AphrontRedirectResponse())
             ->setURI('/owners/package/'.$package->getID().'/');
-        } catch (AphrontQueryDuplicateKeyException $ex) {
+        } catch (AphrontDuplicateKeyQueryException $ex) {
           $e_name = pht('Duplicate');
           $errors[] = pht('Package name must be unique.');
         }
@@ -145,6 +145,7 @@ final class PhabricatorOwnersEditController
     }
 
     $repos = mpull($repos, 'getCallsign', 'getPHID');
+    asort($repos);
 
     $template = new AphrontTypeaheadTemplateView();
     $template = $template->render();
@@ -181,7 +182,7 @@ final class PhabricatorOwnersEditController
           ->setError($e_name))
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/usersorprojects/')
+          ->setDatasource(new PhabricatorProjectOrUserDatasource())
           ->setLabel(pht('Primary Owner'))
           ->setName('primary')
           ->setLimit(1)
@@ -189,7 +190,7 @@ final class PhabricatorOwnersEditController
           ->setError($e_primary))
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/usersorprojects/')
+          ->setDatasource(new PhabricatorProjectOrUserDatasource())
           ->setLabel(pht('Owners'))
           ->setName('owners')
           ->setValue($handles_all_owners))
@@ -211,7 +212,7 @@ final class PhabricatorOwnersEditController
               ? 'enabled'
               : 'disabled'))
       ->appendChild(
-        id(new AphrontFormInsetView())
+        id(new PHUIFormInsetView())
           ->setTitle(pht('Paths'))
           ->addDivAttributes(array('id' => 'path-editor'))
           ->setRightButton(javelin_tag(
@@ -257,7 +258,6 @@ final class PhabricatorOwnersEditController
       ),
       array(
         'title' => $title,
-        'device' => true,
       ));
   }
 

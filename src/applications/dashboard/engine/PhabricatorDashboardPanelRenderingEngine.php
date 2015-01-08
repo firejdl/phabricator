@@ -154,21 +154,26 @@ final class PhabricatorDashboardPanelRenderingEngine extends Phobject {
         $header = null;
         break;
       case self::HEADER_MODE_EDIT:
-        $header = id(new PhabricatorActionHeaderView())
+        $header = id(new PHUIActionHeaderView())
           ->setHeaderTitle($title)
-          ->setHeaderColor(PhabricatorActionHeaderView::HEADER_RED);
+          ->setHeaderColor(PHUIActionHeaderView::HEADER_LIGHTBLUE);
         $header = $this->addPanelHeaderActions($header);
         break;
       case self::HEADER_MODE_NORMAL:
       default:
-        $header = id(new PhabricatorActionHeaderView())
+        $header = id(new PHUIActionHeaderView())
           ->setHeaderTitle($title)
-          ->setHeaderColor(PhabricatorActionHeaderView::HEADER_RED);
+          ->setHeaderColor(PHUIActionHeaderView::HEADER_LIGHTBLUE);
         break;
     }
+    $icon = id(new PHUIIconView())
+      ->setIconFont('fa-warning red msr');
+    $content = id(new PHUIBoxView())
+      ->addClass('dashboard-box')
+      ->appendChild($icon)
+      ->appendChild($body);
     return $this->renderPanelDiv(
-      id(new AphrontErrorView())
-      ->appendChild($body),
+      $content,
       $header);
   }
 
@@ -188,11 +193,14 @@ final class PhabricatorDashboardPanelRenderingEngine extends Phobject {
         'id' => $id,
         'sigil' => 'dashboard-panel',
         'meta' => array(
-          'objectPHID' => $panel->getPHID()),
-        'class' => 'dashboard-panel'),
+          'objectPHID' => $panel->getPHID(),
+        ),
+        'class' => 'dashboard-panel',
+      ),
       array(
         $header,
-        $content));
+        $content,
+      ));
   }
 
 
@@ -204,23 +212,29 @@ final class PhabricatorDashboardPanelRenderingEngine extends Phobject {
         $header = null;
         break;
       case self::HEADER_MODE_EDIT:
-        $header = id(new PhabricatorActionHeaderView())
+        $header = id(new PHUIActionHeaderView())
           ->setHeaderTitle($panel->getName())
-          ->setHeaderColor(PhabricatorActionHeaderView::HEADER_LIGHTBLUE);
+          ->setHeaderColor(PHUIActionHeaderView::HEADER_LIGHTBLUE);
         $header = $this->addPanelHeaderActions($header);
         break;
       case self::HEADER_MODE_NORMAL:
       default:
-        $header = id(new PhabricatorActionHeaderView())
+        $header = id(new PHUIActionHeaderView())
           ->setHeaderTitle($panel->getName())
-          ->setHeaderColor(PhabricatorActionHeaderView::HEADER_LIGHTBLUE);
+          ->setHeaderColor(PHUIActionHeaderView::HEADER_LIGHTBLUE);
+        $panel_type = $panel->getImplementation();
+        $header = $panel_type->adjustPanelHeader(
+          $this->getViewer(),
+          $panel,
+          $this,
+          $header);
         break;
     }
     return $header;
   }
 
   private function addPanelHeaderActions(
-    PhabricatorActionHeaderView $header) {
+    PHUIActionHeaderView $header) {
     $panel = $this->getPanel();
 
     $dashboard_id = $this->getDashboardID();
@@ -231,6 +245,7 @@ final class PhabricatorDashboardPanelRenderingEngine extends Phobject {
     }
     $action_edit = id(new PHUIIconView())
       ->setIconFont('fa-pencil')
+      ->setWorkflow(true)
       ->setHref((string) $edit_uri);
     $header->addAction($action_edit);
 
@@ -246,6 +261,7 @@ final class PhabricatorDashboardPanelRenderingEngine extends Phobject {
     }
     return $header;
   }
+
 
   /**
    * Detect graph cycles in panels, and deeply nested panels.

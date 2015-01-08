@@ -155,6 +155,8 @@ final class DifferentialChangesetViewController extends DifferentialController {
     $parser->setRightSideCommentMapping($right_source, $right_new);
     $parser->setLeftSideCommentMapping($left_source, $left_new);
     $parser->setWhitespaceMode($request->getStr('whitespace'));
+    $parser->setCharacterEncoding($request->getStr('encoding'));
+    $parser->setHighlightAs($request->getStr('highlight'));
 
     if ($request->getStr('renderer') == '1up') {
       $parser->setRenderer(new DifferentialChangesetOneUpRenderer());
@@ -279,6 +281,7 @@ final class DifferentialChangesetViewController extends DifferentialController {
       ),
       array(
         'title' => pht('Changeset View'),
+        'device' => false,
       ));
   }
 
@@ -344,8 +347,7 @@ final class DifferentialChangesetViewController extends DifferentialController {
       unset($unguard);
     }
 
-    return id(new AphrontRedirectResponse())
-      ->setURI($file->getBestURI());
+    return $file->getRedirectResponse();
   }
 
   private function buildLintInlineComments($changeset) {

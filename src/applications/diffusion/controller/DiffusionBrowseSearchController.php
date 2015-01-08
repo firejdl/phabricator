@@ -31,7 +31,6 @@ final class DiffusionBrowseSearchController extends DiffusionBrowseController {
         $content,
       ),
       array(
-        'device' => true,
         'title' => array(
           nonempty(basename($drequest->getPath()), '/'),
           $drequest->getRepository()->getCallsign().' Repository',
@@ -133,9 +132,10 @@ final class DiffusionBrowseSearchController extends DiffusionBrowseController {
     }
 
     try {
-      Futures($futures)->limit(8)->resolveAll();
-    } catch (PhutilSyntaxHighlighterException $ex) {
-    }
+      id(new FutureIterator($futures))
+        ->limit(8)
+        ->resolveAll();
+    } catch (PhutilSyntaxHighlighterException $ex) {}
 
     $rows = array();
     foreach ($results as $result) {
@@ -149,8 +149,7 @@ final class DiffusionBrowseSearchController extends DiffusionBrowseController {
 
       try {
         $string = $futures["{$path}:{$line}"]->resolve();
-      } catch (PhutilSyntaxHighlighterException $ex) {
-      }
+      } catch (PhutilSyntaxHighlighterException $ex) {}
 
       $string = phutil_tag(
         'pre',

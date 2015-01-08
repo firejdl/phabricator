@@ -7,13 +7,20 @@ class PhabricatorApplicationTransactionView extends AphrontView {
 
   private $transactions;
   private $engine;
-  private $anchorOffset = 1;
   private $showEditActions = true;
   private $isPreview;
   private $objectPHID;
   private $shouldTerminate = false;
   private $quoteTargetID;
   private $quoteRef;
+  private $pager;
+  private $renderAsFeed;
+  private $renderData = array();
+
+  public function setRenderAsFeed($feed) {
+    $this->renderAsFeed = $feed;
+    return $this;
+  }
 
   public function setQuoteRef($quote_ref) {
     $this->quoteRef = $quote_ref;
@@ -56,11 +63,6 @@ class PhabricatorApplicationTransactionView extends AphrontView {
     return $this->showEditActions;
   }
 
-  public function setAnchorOffset($anchor_offset) {
-    $this->anchorOffset = $anchor_offset;
-    return $this;
-  }
-
   public function setMarkupEngine(PhabricatorMarkupEngine $engine) {
     $this->engine = $engine;
     return $this;
@@ -72,15 +74,41 @@ class PhabricatorApplicationTransactionView extends AphrontView {
     return $this;
   }
 
+  public function getTransactions() {
+    return $this->transactions;
+  }
+
   public function setShouldTerminate($term) {
     $this->shouldTerminate = $term;
     return $this;
   }
 
+  public function setPager(AphrontCursorPagerView $pager) {
+    $this->pager = $pager;
+    return $this;
+  }
+
+  public function getPager() {
+    return $this->pager;
+  }
+
+  /**
+   * This is additional data that may be necessary to render the next set
+   * of transactions. Objects that implement
+   * PhabricatorApplicationTransactionInterface use this data in
+   * willRenderTimeline.
+   */
+  public function setRenderData(array $data) {
+    $this->renderData = $data;
+    return $this;
+  }
+
+  public function getRenderData() {
+    return $this->renderData;
+  }
+
   public function buildEvents($with_hiding = false) {
     $user = $this->getUser();
-
-    $anchor = $this->anchorOffset;
 
     $xactions = $this->transactions;
 
@@ -122,21 +150,29 @@ class PhabricatorApplicationTransactionView extends AphrontView {
 
     $events = array();
     $hide_by_default = ($show_group !== null);
+    $set_next_page_id = false;
 
     foreach ($groups as $group_key => $group) {
       if ($hide_by_default && ($show_group === $group_key)) {
         $hide_by_default = false;
+        $set_next_page_id = true;
       }
 
       $group_event = null;
       foreach ($group as $xaction) {
-        $event = $this->renderEvent($xaction, $group, $anchor);
+        $event = $this->renderEvent($xaction, $group);
         $event->setHideByDefault($hide_by_default);
-        $anchor++;
         if (!$group_event) {
           $group_event = $event;
         } else {
           $group_event->addEventToGroup($event);
+        }
+        if ($set_next_page_id) {
+          $set_next_page_id = false;
+          $pager = $this->getPager();
+          if ($pager) {
+            $pager->setNextPageID($xaction->getID());
+          }
         }
       }
       $events[] = $group_event;
@@ -151,28 +187,37 @@ class PhabricatorApplicationTransactionView extends AphrontView {
       throw new Exception('Call setObjectPHID() before render()!');
     }
 
-    $view = new PHUITimelineView();
-    $view->setShouldTerminate($this->shouldTerminate);
-    $events = $this->buildEvents($with_hiding = true);
-    foreach ($events as $event) {
-      $view->addEvent($event);
-    }
+    $view = $this->buildPHUITimelineView();
 
     if ($this->getShowEditActions()) {
-      $list_id = celerity_generate_unique_node_id();
-
-      $view->setID($list_id);
-
-      Javelin::initBehavior(
-        'phabricator-transaction-list',
-        array(
-          'listID'          => $list_id,
-          'objectPHID'      => $this->getObjectPHID(),
-          'nextAnchor'      => $this->anchorOffset + count($events),
-        ));
+      Javelin::initBehavior('phabricator-transaction-list');
     }
 
     return $view->render();
+  }
+
+  public function buildPHUITimelineView($with_hiding = true) {
+    if (!$this->getObjectPHID()) {
+      throw new Exception(
+        'Call setObjectPHID() before buildPHUITimelineView()!');
+    }
+
+    $view = new PHUITimelineView();
+    $view->setShouldTerminate($this->shouldTerminate);
+    $view->setQuoteTargetID($this->getQuoteTargetID());
+    $view->setQuoteRef($this->getQuoteRef());
+    $events = $this->buildEvents($with_hiding);
+    foreach ($events as $event) {
+      $view->addEvent($event);
+    }
+    if ($this->getPager()) {
+      $view->setPager($this->getPager());
+    }
+    if ($this->getRenderData()) {
+      $view->setRenderData($this->getRenderData());
+    }
+
+    return $view;
   }
 
   protected function getOrBuildEngine() {
@@ -261,6 +306,7 @@ class PhabricatorApplicationTransactionView extends AphrontView {
         return javelin_tag(
           'span',
           array(
+            'class' => 'transaction-comment',
             'sigil' => 'transaction-comment',
             'meta'  => array('phid' => $comment->getTransactionPHID()),
           ),
@@ -334,8 +380,7 @@ class PhabricatorApplicationTransactionView extends AphrontView {
 
   private function renderEvent(
     PhabricatorApplicationTransaction $xaction,
-    array $group,
-    $anchor) {
+    array $group) {
     $viewer = $this->getUser();
 
     $event = id(new PHUITimelineEventView())
@@ -351,7 +396,11 @@ class PhabricatorApplicationTransactionView extends AphrontView {
     }
 
     if (!$this->shouldSuppressTitle($xaction, $group)) {
-      $title = $xaction->getTitle();
+      if ($this->renderAsFeed) {
+        $title = $xaction->getTitleForFeed();
+      } else {
+        $title = $xaction->getTitle();
+      }
       if ($xaction->hasChangeDetails()) {
         if (!$this->isPreview) {
           $details = $this->buildChangeDetailsLink($xaction);
@@ -379,7 +428,7 @@ class PhabricatorApplicationTransactionView extends AphrontView {
       $event
         ->setDateCreated($xaction->getDateCreated())
         ->setContentSource($xaction->getContentSource())
-        ->setAnchor($anchor);
+        ->setAnchor($xaction->getID());
     }
 
     $transaction_type = $xaction->getTransactionType();

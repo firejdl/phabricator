@@ -52,12 +52,12 @@ final class PhabricatorProjectArchiveController
     }
 
     if ($project->isArchived()) {
-      $title = pht('Really unarchive project?');
+      $title = pht('Really activate project?');
       $body = pht('This project will become active again.');
-      $button = pht('Unarchive Project');
+      $button = pht('Activate Project');
     } else {
       $title = pht('Really archive project?');
-      $body = pht('This project will moved to the archive.');
+      $body = pht('This project will be moved to the archive.');
       $button = pht('Archive Project');
     }
 

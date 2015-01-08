@@ -1,9 +1,8 @@
 <?php
 
-final class PhabricatorHomeMainController
-  extends PhabricatorHomeController {
+final class PhabricatorHomeMainController extends PhabricatorHomeController {
 
-  private $filter;
+  private $only;
   private $minipanels = array();
 
   public function shouldAllowPublic() {
@@ -11,57 +10,69 @@ final class PhabricatorHomeMainController
   }
 
   public function willProcessRequest(array $data) {
-    $this->filter = idx($data, 'filter');
+    $this->only = idx($data, 'only');
   }
 
   public function processRequest() {
     $user = $this->getRequest()->getUser();
-    $nav = $this->buildNav();
 
     $dashboard = PhabricatorDashboardInstall::getDashboard(
       $user,
       $user->getPHID(),
       get_class($this->getCurrentApplication()));
+
+    if (!$dashboard) {
+      $dashboard = PhabricatorDashboardInstall::getDashboard(
+        $user,
+        PhabricatorHomeApplication::DASHBOARD_DEFAULT,
+        get_class($this->getCurrentApplication()));
+    }
+
     if ($dashboard) {
-      $rendered_dashboard = id(new PhabricatorDashboardRenderingEngine())
+      $content = id(new PhabricatorDashboardRenderingEngine())
         ->setViewer($user)
         ->setDashboard($dashboard)
         ->renderDashboard();
-      $nav->appendChild($rendered_dashboard);
     } else {
       $project_query = new PhabricatorProjectQuery();
       $project_query->setViewer($user);
       $project_query->withMemberPHIDs(array($user->getPHID()));
       $projects = $project_query->execute();
 
-      $nav = $this->buildMainResponse($nav, $projects);
+      $content = $this->buildMainResponse($projects);
     }
 
-    $nav->appendChild(id(new PhabricatorGlobalUploadTargetView())
-      ->setUser($user));
+    if (!$this->only) {
+      $nav = $this->buildNav();
+      $nav->appendChild(
+        array(
+          $content,
+          id(new PhabricatorGlobalUploadTargetView())->setUser($user),
+        ));
+      $content = $nav;
+    }
 
     return $this->buildApplicationPage(
-      $nav,
+      $content,
       array(
         'title' => 'Phabricator',
-        'device' => true,
       ));
   }
 
-  private function buildMainResponse($nav, array $projects) {
+  private function buildMainResponse(array $projects) {
     assert_instances_of($projects, 'PhabricatorProject');
     $viewer = $this->getRequest()->getUser();
 
     $has_maniphest = PhabricatorApplication::isClassInstalledForViewer(
-      'PhabricatorApplicationManiphest',
+      'PhabricatorManiphestApplication',
       $viewer);
 
     $has_audit = PhabricatorApplication::isClassInstalledForViewer(
-      'PhabricatorApplicationAudit',
+      'PhabricatorAuditApplication',
       $viewer);
 
     $has_differential = PhabricatorApplication::isClassInstalledForViewer(
-      'PhabricatorApplicationDifferential',
+      'PhabricatorDifferentialApplication',
       $viewer);
 
     if ($has_maniphest) {
@@ -94,7 +105,7 @@ final class PhabricatorHomeMainController
       $revision_panel = null;
     }
 
-    $content = array(
+    return array(
       $welcome_panel,
       $unbreak_panel,
       $triage_panel,
@@ -104,11 +115,6 @@ final class PhabricatorHomeMainController
       $commit_panel,
       $this->minipanels,
     );
-
-    $nav->appendChild($content);
-
-    return $nav;
-
   }
 
   private function buildUnbreakNowPanel() {
@@ -124,6 +130,7 @@ final class PhabricatorHomeMainController
       ->setViewer($user)
       ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
       ->withPriorities(array($unbreak_now))
+      ->needProjectPHIDs(true)
       ->setLimit(10);
 
     $tasks = $task_query->execute();
@@ -167,6 +174,7 @@ final class PhabricatorHomeMainController
         ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
         ->withPriorities(array($needs_triage))
         ->withAnyProjects(mpull($projects, 'getPHID'))
+        ->needProjectPHIDs(true)
         ->setLimit(10);
       $tasks = $task_query->execute();
     } else {
@@ -263,6 +271,7 @@ final class PhabricatorHomeMainController
       ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
       ->setGroupBy(ManiphestTaskQuery::GROUP_PRIORITY)
       ->withOwners(array($user_phid))
+      ->needProjectPHIDs(true)
       ->setLimit(10);
 
     $tasks = $task_query->execute();
@@ -321,7 +330,7 @@ final class PhabricatorHomeMainController
         ),
         array(
           phutil_tag('strong', array(), $title.': '),
-          $body
+          $body,
         )));
     $this->minipanels[] = $panel;
   }

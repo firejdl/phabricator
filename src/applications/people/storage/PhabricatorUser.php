@@ -9,7 +9,8 @@ final class PhabricatorUser
     PhutilPerson,
     PhabricatorPolicyInterface,
     PhabricatorCustomFieldInterface,
-    PhabricatorDestructableInterface {
+    PhabricatorDestructibleInterface,
+    PhabricatorSSHPublicKeyInterface {
 
   const SESSION_TABLE = 'phabricator_session';
   const NAMETOKEN_TABLE = 'user_nametoken';
@@ -81,6 +82,10 @@ final class PhabricatorUser
    * @return bool True if this is a standard, usable account.
    */
   public function isUserActivated() {
+    if ($this->isOmnipotent()) {
+      return true;
+    }
+
     if ($this->getIsDisabled()) {
       return false;
     }
@@ -106,20 +111,57 @@ final class PhabricatorUser
    *              a normal session.
    */
   public function getIsStandardUser() {
-    $type_user = PhabricatorPeoplePHIDTypeUser::TYPECONST;
+    $type_user = PhabricatorPeopleUserPHIDType::TYPECONST;
     return $this->getPHID() && (phid_get_type($this->getPHID()) == $type_user);
   }
 
   public function getConfiguration() {
     return array(
       self::CONFIG_AUX_PHID => true,
-      self::CONFIG_PARTIAL_OBJECTS => true,
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'userName' => 'sort64',
+        'realName' => 'text128',
+        'sex' => 'text4?',
+        'translation' => 'text64?',
+        'passwordSalt' => 'text32?',
+        'passwordHash' => 'text128?',
+        'profileImagePHID' => 'phid?',
+        'consoleEnabled' => 'bool',
+        'consoleVisible' => 'bool',
+        'consoleTab' => 'text64',
+        'conduitCertificate' => 'text255',
+        'isSystemAgent' => 'bool',
+        'isDisabled' => 'bool',
+        'isAdmin' => 'bool',
+        'timezoneIdentifier' => 'text255',
+        'isEmailVerified' => 'uint32',
+        'isApproved' => 'uint32',
+        'accountSecret' => 'bytes64',
+        'isEnrolledInMultiFactor' => 'bool',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_phid' => null,
+        'phid' => array(
+          'columns' => array('phid'),
+          'unique' => true,
+        ),
+        'userName' => array(
+          'columns' => array('userName'),
+          'unique' => true,
+        ),
+        'realName' => array(
+          'columns' => array('realName'),
+        ),
+        'key_approved' => array(
+          'columns' => array('isApproved'),
+        ),
+      ),
     ) + parent::getConfiguration();
   }
 
   public function generatePHID() {
     return PhabricatorPHID::generateNewPHID(
-      PhabricatorPeoplePHIDTypeUser::TYPECONST);
+      PhabricatorPeopleUserPHIDType::TYPECONST);
   }
 
   public function setPassword(PhutilOpaqueEnvelope $envelope) {
@@ -340,6 +382,10 @@ final class PhabricatorUser
       $vec = $this->getAlternateCSRFString();
     }
 
+    if ($this->hasSession()) {
+      $vec = $vec.$this->getSession()->getSessionKey();
+    }
+
     $time_block = floor($epoch / $frequency);
     $vec = $vec.$key.$time_block;
 
@@ -404,7 +450,8 @@ final class PhabricatorUser
         PhabricatorUserPreferences::PREFERENCE_TITLES => 'glyph',
         PhabricatorUserPreferences::PREFERENCE_EDITOR => '',
         PhabricatorUserPreferences::PREFERENCE_MONOSPACED => '',
-        PhabricatorUserPreferences::PREFERENCE_DARK_CONSOLE => 0);
+        PhabricatorUserPreferences::PREFERENCE_DARK_CONSOLE => 0,
+      );
 
       $preferences->setPreferences($default_dict);
     }
@@ -460,31 +507,17 @@ final class PhabricatorUser
     return $this;
   }
 
-  private static function tokenizeName($name) {
-    if (function_exists('mb_strtolower')) {
-      $name = mb_strtolower($name, 'UTF-8');
-    } else {
-      $name = strtolower($name);
-    }
-    $name = trim($name);
-    if (!strlen($name)) {
-      return array();
-    }
-    return preg_split('/\s+/', $name);
-  }
-
   /**
    * Populate the nametoken table, which used to fetch typeahead results. When
    * a user types "linc", we want to match "Abraham Lincoln" from on-demand
    * typeahead sources. To do this, we need a separate table of name fragments.
    */
   public function updateNameTokens() {
-    $tokens = array_merge(
-      self::tokenizeName($this->getRealName()),
-      self::tokenizeName($this->getUserName()));
-    $tokens = array_unique($tokens);
     $table  = self::NAMETOKEN_TABLE;
     $conn_w = $this->establishConnection('w');
+
+    $tokens = PhabricatorTypeaheadDatasource::tokenizeString(
+      $this->getUserName().' '.$this->getRealName());
 
     $sql = array();
     foreach ($tokens as $token) {
@@ -551,6 +584,7 @@ EOBODY;
 
     $mail = id(new PhabricatorMetaMTAMail())
       ->addTos(array($this->getPHID()))
+      ->setForceDelivery(true)
       ->setSubject('[Phabricator] Welcome to Phabricator')
       ->setBody($body)
       ->saveAndSend();
@@ -565,7 +599,7 @@ EOBODY;
     $new_username = $this->getUserName();
 
     $password_instructions = null;
-    if (PhabricatorAuthProviderPassword::getPasswordProvider()) {
+    if (PhabricatorPasswordAuthProvider::getPasswordProvider()) {
       $engine = new PhabricatorAuthSessionEngine();
       $uri = $engine->getOneTimeLoginURI(
         $this,
@@ -594,6 +628,7 @@ EOBODY;
 
     $mail = id(new PhabricatorMetaMTAMail())
       ->addTos(array($this->getPHID()))
+      ->setForceDelivery(true)
       ->setSubject('[Phabricator] Username Changed')
       ->setBody($body)
       ->saveAndSend();
@@ -836,7 +871,7 @@ EOBODY;
   }
 
 
-/* -(  PhabricatorDestructableInterface  )----------------------------------- */
+/* -(  PhabricatorDestructibleInterface  )----------------------------------- */
 
 
   public function destroyObjectPermanently(
@@ -866,8 +901,8 @@ EOBODY;
         $profile->delete();
       }
 
-      $keys = id(new PhabricatorUserSSHKey())->loadAllWhere(
-        'userPHID = %s',
+      $keys = id(new PhabricatorAuthSSHKey())->loadAllWhere(
+        'objectPHID = %s',
         $this->getPHID());
       foreach ($keys as $key) {
         $key->delete();
@@ -897,5 +932,23 @@ EOBODY;
     $this->saveTransaction();
   }
 
+
+/* -(  PhabricatorSSHPublicKeyInterface  )----------------------------------- */
+
+
+  public function getSSHPublicKeyManagementURI(PhabricatorUser $viewer) {
+    if ($viewer->getPHID() == $this->getPHID()) {
+      // If the viewer is managing their own keys, take them to the normal
+      // panel.
+      return '/settings/panel/ssh/';
+    } else {
+      // Otherwise, take them to the administrative panel for this user.
+      return '/settings/'.$this->getID().'/panel/ssh/';
+    }
+  }
+
+  public function getSSHKeyDefaultName() {
+    return 'id_rsa_phabricator';
+  }
 
 }

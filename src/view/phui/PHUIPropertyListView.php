@@ -64,7 +64,7 @@ final class PHUIPropertyListView extends AphrontView {
     return $this;
   }
 
-  public function addSectionHeader($name, $icon=null) {
+  public function addSectionHeader($name, $icon = null) {
     $this->parts[] = array(
       'type' => 'section',
       'name' => $name,
@@ -76,6 +76,14 @@ final class PHUIPropertyListView extends AphrontView {
   public function addTextContent($content) {
     $this->parts[] = array(
       'type'    => 'text',
+      'content' => $content,
+    );
+    return $this;
+  }
+
+  public function addRawContent($content) {
+    $this->parts[] = array(
+      'type'    => 'raw',
       'content' => $content,
     );
     return $this;
@@ -143,6 +151,9 @@ final class PHUIPropertyListView extends AphrontView {
         case 'image':
           $items[] = $this->renderTextPart($part);
           break;
+        case 'raw':
+          $items[] = $this->renderRawPart($part);
+          break;
         default:
           throw new Exception(pht("Unknown part type '%s'!", $type));
       }
@@ -193,7 +204,7 @@ final class PHUIPropertyListView extends AphrontView {
     $list = phutil_tag(
       'dl',
       array(
-        'class' => 'phui-property-list-properties '.$stacked,
+        'class' => 'phui-property-list-properties',
       ),
       $items);
 
@@ -205,7 +216,7 @@ final class PHUIPropertyListView extends AphrontView {
     $list = phutil_tag(
       'div',
       array(
-        'class' => 'phui-property-list-properties-wrap',
+        'class' => 'phui-property-list-properties-wrap '.$stacked,
       ),
       array($shortcuts, $list));
 
@@ -255,6 +266,17 @@ final class PHUIPropertyListView extends AphrontView {
     if ($part['type'] == 'image') {
       $classes[] = 'phui-property-list-image-content';
     }
+    return phutil_tag(
+      'div',
+      array(
+        'class' => implode($classes, ' '),
+      ),
+      $part['content']);
+  }
+
+  private function renderRawPart(array $part) {
+    $classes = array();
+    $classes[] = 'phui-property-list-raw-content';
     return phutil_tag(
       'div',
       array(

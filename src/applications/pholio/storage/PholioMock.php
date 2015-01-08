@@ -8,12 +8,14 @@ final class PholioMock extends PholioDAO
     PhabricatorTokenReceiverInterface,
     PhabricatorFlaggableInterface,
     PhabricatorApplicationTransactionInterface,
-    PhabricatorProjectInterface {
+    PhabricatorProjectInterface,
+    PhabricatorDestructibleInterface {
 
   const MARKUP_FIELD_DESCRIPTION  = 'markup:description';
 
   protected $authorPHID;
   protected $viewPolicy;
+  protected $editPolicy;
 
   protected $name;
   protected $originalName;
@@ -30,20 +32,43 @@ final class PholioMock extends PholioDAO
   public static function initializeNewMock(PhabricatorUser $actor) {
     $app = id(new PhabricatorApplicationQuery())
       ->setViewer($actor)
-      ->withClasses(array('PhabricatorApplicationPholio'))
+      ->withClasses(array('PhabricatorPholioApplication'))
       ->executeOne();
 
-    $view_policy = $app->getPolicy(PholioCapabilityDefaultView::CAPABILITY);
+    $view_policy = $app->getPolicy(PholioDefaultViewCapability::CAPABILITY);
+    $edit_policy = $app->getPolicy(PholioDefaultEditCapability::CAPABILITY);
 
     return id(new PholioMock())
       ->setAuthorPHID($actor->getPHID())
       ->attachImages(array())
-      ->setViewPolicy($view_policy);
+      ->setViewPolicy($view_policy)
+      ->setEditPolicy($edit_policy);
+  }
+
+  public function getMonogram() {
+    return 'M'.$this->getID();
   }
 
   public function getConfiguration() {
     return array(
       self::CONFIG_AUX_PHID => true,
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'name' => 'text128',
+        'description' => 'text',
+        'originalName' => 'text128',
+        'mailKey' => 'bytes20',
+        'status' => 'text12',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_phid' => null,
+        'phid' => array(
+          'columns' => array('phid'),
+          'unique' => true,
+        ),
+        'authorPHID' => array(
+          'columns' => array('authorPHID'),
+        ),
+      ),
     ) + parent::getConfiguration();
   }
 
@@ -133,8 +158,8 @@ final class PholioMock extends PholioDAO
 
   public function getStatuses() {
     $options = array();
-    $options['closed'] = 'Closed';
-    $options['open'] = 'Open';
+    $options['open'] = pht('Open');
+    $options['closed'] = pht('Closed');
     return $options;
   }
 
@@ -174,7 +199,7 @@ final class PholioMock extends PholioDAO
       case PhabricatorPolicyCapability::CAN_VIEW:
         return $this->getViewPolicy();
       case PhabricatorPolicyCapability::CAN_EDIT:
-        return PhabricatorPolicies::POLICY_NOONE;
+        return $this->getEditPolicy();
     }
   }
 
@@ -239,6 +264,17 @@ final class PholioMock extends PholioDAO
     return new PholioTransaction();
   }
 
+  public function willRenderTimeline(
+    PhabricatorApplicationTransactionView $timeline,
+    AphrontRequest $request) {
+
+    PholioMockQuery::loadImages(
+      $request->getUser(),
+      array($this),
+      $need_inline_comments = true);
+    $timeline->setMock($this);
+    return $timeline;
+  }
 
 /* -(  PhabricatorTokenReceiverInterface  )---------------------------------- */
 
@@ -247,6 +283,25 @@ final class PholioMock extends PholioDAO
     return array(
       $this->getAuthorPHID(),
     );
+  }
+
+
+/* -(  PhabricatorDestructibleInterface  )----------------------------------- */
+
+
+  public function destroyObjectPermanently(
+    PhabricatorDestructionEngine $engine) {
+
+    $this->openTransaction();
+      $images = id(new PholioImage())->loadAllWhere(
+        'mockID = %d',
+        $this->getID());
+      foreach ($images as $image) {
+        $image->delete();
+      }
+
+      $this->delete();
+    $this->saveTransaction();
   }
 
 }

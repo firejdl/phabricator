@@ -3,8 +3,12 @@
 final class HarbormasterBuildPlanSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationHarbormaster';
+  public function getResultTypeDescription() {
+    return pht('Harbormaster Build Plans');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorHarbormasterApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -48,24 +52,20 @@ final class HarbormasterBuildPlanSearchEngine
             HarbormasterBuildPlan::STATUS_DISABLED,
             pht('Disabled'),
             in_array(HarbormasterBuildPlan::STATUS_DISABLED, $status)));
-
   }
 
   protected function getURI($path) {
     return '/harbormaster/plan/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array(
+  protected function getBuiltinQueryNames() {
+    return array(
       'active' => pht('Active Plans'),
       'all' => pht('All Plans'),
     );
-
-    return $names;
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 

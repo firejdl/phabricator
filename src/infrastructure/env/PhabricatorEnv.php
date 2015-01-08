@@ -117,7 +117,7 @@ final class PhabricatorEnv {
     $translation = PhabricatorEnv::newObjectFromConfig('translation.provider');
     PhutilTranslator::getInstance()
       ->setLanguage($translation->getLanguage())
-      ->addTranslations($translation->getTranslations());
+      ->addTranslations($translation->getCleanTranslations());
   }
 
   private static function buildConfigurationSourceStack() {
@@ -152,6 +152,15 @@ final class PhabricatorEnv {
     // values as the Default source has already been loaded, so we get it to
     // pull in all options from non-phabricator libraries now they are loaded.
     $default_source->loadExternalOptions();
+
+    // If this install has site config sources, load them now.
+    $site_sources = id(new PhutilSymbolLoader())
+      ->setAncestorClass('PhabricatorConfigSiteSource')
+      ->loadObjects();
+    $site_sources = msort($site_sources, 'getPriority');
+    foreach ($site_sources as $site_source) {
+      $stack->pushSource($site_source);
+    }
 
     try {
       $stack->pushSource(
@@ -219,6 +228,17 @@ final class PhabricatorEnv {
     }
 
     return $env;
+  }
+
+  public static function calculateEnvironmentHash() {
+    $keys = array_keys(self::getAllConfigKeys());
+    ksort($keys);
+
+    $values = array();
+    foreach ($keys as $key) {
+      $values[$key] = self::getEnvConfigIfExists($key);
+    }
+    return PhabricatorHash::digest(json_encode($values));
   }
 
 
@@ -462,6 +482,21 @@ final class PhabricatorEnv {
       return false;
     }
 
+    // Chrome (at a minimum) interprets backslashes in Location headers and the
+    // URL bar as forward slashes. This is probably intended to reduce user
+    // error caused by confusion over which key is "forward slash" vs "back
+    // slash".
+    //
+    // However, it means a URI like "/\evil.com" is interpreted like
+    // "//evil.com", which is a protocol relative remote URI.
+    //
+    // Since we currently never generate URIs with backslashes in them, reject
+    // these unconditionally rather than trying to figure out how browsers will
+    // interpret them.
+    if (preg_match('/\\\\/', $uri)) {
+      return false;
+    }
+
     // Valid URIs must begin with '/', followed by the end of the string or some
     // other non-'/' character. This rejects protocol-relative URIs like
     // "//evil.com/evil_stuff/".
@@ -493,6 +528,32 @@ final class PhabricatorEnv {
     return true;
   }
 
+  public static function isClusterRemoteAddress() {
+    $address = idx($_SERVER, 'REMOTE_ADDR');
+    if (!$address) {
+      throw new Exception(
+        pht(
+          'Unable to test remote address against cluster whitelist: '.
+          'REMOTE_ADDR is not defined.'));
+    }
+
+    return self::isClusterAddress($address);
+  }
+
+  public static function isClusterAddress($address) {
+    $cluster_addresses = PhabricatorEnv::getEnvConfig('cluster.addresses');
+    if (!$cluster_addresses) {
+      throw new Exception(
+        pht(
+          'Phabricator is not configured to serve cluster requests. '.
+          'Set `cluster.addresses` in the configuration to whitelist '.
+          'cluster hosts before sending requests that use a cluster '.
+          'authentication mechanism.'));
+    }
+
+    return PhutilCIDRList::newList($cluster_addresses)
+      ->containsAddress($address);
+  }
 
 /* -(  Internals  )---------------------------------------------------------- */
 

@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group maniphest
- */
 final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
 
   public function validateMailReceiver($mail_receiver) {
@@ -36,7 +33,6 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
   }
 
   protected function receiveEmail(PhabricatorMetaMTAReceivedMail $mail) {
-
     // NOTE: We'll drop in here on both the "reply to a task" and "create a
     // new task" workflows! Make sure you test both if you make changes!
 
@@ -61,17 +57,19 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
 
     $is_unsub = false;
     if ($is_new_task) {
-      // If this is a new task, create a "User created this task." transaction
-      // and then set the title and description.
-      $xaction = clone $template;
-      $xaction->setTransactionType(ManiphestTransaction::TYPE_STATUS);
-      $xaction->setNewValue(ManiphestTaskStatus::getDefaultStatus());
-      $xactions[] = $xaction;
+      $task = ManiphestTask::initializeNewTask($user);
 
-      $task->setAuthorPHID($user->getPHID());
-      $task->setTitle(nonempty($mail->getSubject(), 'Untitled Task'));
-      $task->setDescription($body);
-      $task->setPriority(ManiphestTaskPriority::getDefaultPriority());
+      $xactions[] = id(new ManiphestTransaction())
+        ->setTransactionType(ManiphestTransaction::TYPE_STATUS)
+        ->setNewValue(ManiphestTaskStatus::getDefaultStatus());
+
+      $xactions[] = id(new ManiphestTransaction())
+        ->setTransactionType(ManiphestTransaction::TYPE_TITLE)
+        ->setNewValue(nonempty($mail->getSubject(), pht('Untitled Task')));
+
+      $xactions[] = id(new ManiphestTransaction())
+        ->setTransactionType(ManiphestTransaction::TYPE_DESCRIPTION)
+        ->setNewValue($body);
 
     } else {
 
@@ -108,14 +106,14 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
           break;
         case 'unsubscribe':
           $is_unsub = true;
-          $ttype = ManiphestTransaction::TYPE_CCS;
-          $ccs = $task->getCCPHIDs();
+          $ttype = PhabricatorTransactions::TYPE_SUBSCRIBERS;
+          $ccs = $task->getSubscriberPHIDs();
           foreach ($ccs as $k => $phid) {
             if ($phid == $user->getPHID()) {
               unset($ccs[$k]);
             }
           }
-          $new_value = array_values($ccs);
+          $new_value = array('=' => array_values($ccs));
           break;
       }
 
@@ -134,11 +132,10 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
             ->setContent($body));
         $xactions[] = $xaction;
       }
-
     }
 
     $ccs = $mail->loadCCPHIDs();
-    $old_ccs = $task->getCCPHIDs();
+    $old_ccs = $task->getSubscriberPHIDs();
     $new_ccs = array_merge($old_ccs, $ccs);
     if (!$is_unsub) {
       $new_ccs[] = $user->getPHID();
@@ -147,8 +144,9 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
 
     if (array_diff($new_ccs, $old_ccs)) {
       $cc_xaction = clone $template;
-      $cc_xaction->setTransactionType(ManiphestTransaction::TYPE_CCS);
-      $cc_xaction->setNewValue($new_ccs);
+      $cc_xaction->setTransactionType(
+        PhabricatorTransactions::TYPE_SUBSCRIBERS);
+      $cc_xaction->setNewValue(array('=' => $new_ccs));
       $xactions[] = $cc_xaction;
     }
 
@@ -184,7 +182,6 @@ final class ManiphestReplyHandler extends PhabricatorMailReplyHandler {
       ));
     $event->setUser($user);
     PhutilEventEngine::dispatchEvent($event);
-
   }
 
 }

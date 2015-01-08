@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group paste
- */
 abstract class PhabricatorPasteController extends PhabricatorController {
 
   public function buildSideNavView($for_app = false) {
@@ -24,11 +21,11 @@ abstract class PhabricatorPasteController extends PhabricatorController {
     return $nav;
   }
 
-  public function buildApplicationMenu() {
+  protected function buildApplicationMenu() {
     return $this->buildSideNavView(true)->getMenu();
   }
 
-  public function buildApplicationCrumbs() {
+  protected function buildApplicationCrumbs() {
     $crumbs = parent::buildApplicationCrumbs();
 
     $crumbs->addAction(

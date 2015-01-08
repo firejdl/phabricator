@@ -62,7 +62,6 @@ final class DifferentialDiffQuery
 
     foreach ($diffs as $key => $diff) {
       if (!$diff->getRevisionID()) {
-        $diff->attachRevision(null);
         continue;
       }
 
@@ -151,7 +150,7 @@ final class DifferentialDiffQuery
   }
 
   public function getQueryApplicationClass() {
-    return 'PhabricatorApplicationDifferential';
+    return 'PhabricatorDifferentialApplication';
   }
 
 }

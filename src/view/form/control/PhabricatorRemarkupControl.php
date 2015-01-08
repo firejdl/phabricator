@@ -3,8 +3,15 @@
 final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
   private $disableMacro = false;
 
+  private $disableFullScreen = false;
+
   public function setDisableMacros($disable) {
     $this->disableMacro = $disable;
+    return $this;
+  }
+
+  public function setDisableFullScreen($disable) {
+    $this->disableFullScreen = $disable;
     return $this;
   }
 
@@ -13,6 +20,12 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
     if (!$id) {
       $id = celerity_generate_unique_node_id();
       $this->setID($id);
+    }
+
+    $viewer = $this->getUser();
+    if (!$viewer) {
+      throw new Exception(
+        pht('Call setUser() before rendering a PhabricatorRemarkupControl!'));
     }
 
     // We need to have this if previews render images, since Ajax can not
@@ -75,7 +88,17 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
       ),
     );
 
-    if (!$this->disableMacro and function_exists('imagettftext')) {
+    $can_use_macros =
+      (!$this->disableMacro) &&
+      (function_exists('imagettftext'));
+
+    if ($can_use_macros) {
+      $can_use_macros = PhabricatorApplication::isClassInstalledForViewer(
+        'PhabricatorMacroApplication',
+        $viewer);
+    }
+
+    if ($can_use_macros) {
       $actions[] = array(
         'spacer' => true,
         );
@@ -90,15 +113,17 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
         'href'  => PhabricatorEnv::getDoclink('Remarkup Reference'),
       );
 
-    $actions[] = array(
-      'spacer' => true,
-      'align' => 'right',
-    );
+    if (!$this->disableFullScreen) {
+      $actions[] = array(
+        'spacer' => true,
+        'align' => 'right',
+      );
 
-    $actions['fa-arrows-alt'] = array(
-      'tip' => pht('Fullscreen Mode'),
-      'align' => 'right',
-    );
+      $actions['fa-arrows-alt'] = array(
+        'tip' => pht('Fullscreen Mode'),
+        'align' => 'right',
+      );
+    }
 
     $buttons = array();
     foreach ($actions as $action => $spec) {
@@ -175,16 +200,13 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
 
     $monospaced_textareas = null;
     $monospaced_textareas_class = null;
-    $user = $this->getUser();
 
-    if ($user) {
-      $monospaced_textareas = $user
-        ->loadPreferences()
-        ->getPreference(
-          PhabricatorUserPreferences::PREFERENCE_MONOSPACED_TEXTAREAS);
-      if ($monospaced_textareas == 'enabled') {
-        $monospaced_textareas_class = 'PhabricatorMonospaced';
-      }
+    $monospaced_textareas = $viewer
+      ->loadPreferences()
+      ->getPreference(
+        PhabricatorUserPreferences::PREFERENCE_MONOSPACED_TEXTAREAS);
+    if ($monospaced_textareas == 'enabled') {
+      $monospaced_textareas_class = 'PhabricatorMonospaced';
     }
 
     $this->setCustomClass(

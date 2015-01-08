@@ -3,8 +3,12 @@
 final class HarbormasterBuildableSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationHarbormaster';
+  public function getResultTypeDescription() {
+    return pht('Harbormaster Buildables');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorHarbormasterApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -14,14 +18,14 @@ final class HarbormasterBuildableSearchEngine
       $request,
       'revisions',
       array(
-        DifferentialPHIDTypeRevision::TYPECONST,
+        DifferentialRevisionPHIDType::TYPECONST,
       ));
 
     $repositories = $this->readPHIDsFromRequest(
       $request,
       'repositories',
       array(
-        PhabricatorRepositoryPHIDTypeRepository::TYPECONST,
+        PhabricatorRepositoryRepositoryPHIDType::TYPECONST,
       ));
 
     $container_phids = array_merge($revisions, $repositories);
@@ -31,7 +35,7 @@ final class HarbormasterBuildableSearchEngine
       $request,
       'commits',
       array(
-        PhabricatorRepositoryPHIDTypeCommit::TYPECONST,
+        PhabricatorRepositoryCommitPHIDType::TYPECONST,
       ));
 
     $diffs = $this->readListFromRequest($request, 'diffs');
@@ -155,16 +159,13 @@ final class HarbormasterBuildableSearchEngine
     return '/harbormaster/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array(
+  protected function getBuiltinQueryNames() {
+    return array(
       'all' => pht('All Buildables'),
     );
-
-    return $names;
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 
@@ -205,21 +206,10 @@ final class HarbormasterBuildableSearchEngine
         $item->addIcon('fa-wrench grey', pht('Manual'));
       }
 
-      switch ($buildable->getBuildableStatus()) {
-        case HarbormasterBuildable::STATUS_PASSED:
-          $item->setBarColor('green');
-          $item->addByline(pht('Build Passed'));
-          break;
-        case HarbormasterBuildable::STATUS_FAILED:
-          $item->setBarColor('red');
-          $item->addByline(pht('Build Failed'));
-          break;
-        case HarbormasterBuildable::STATUS_BUILDING:
-          $item->setBarColor('red');
-          $item->addByline(pht('Building'));
-          break;
-
-      }
+      $item->setBarColor(HarbormasterBuildable::getBuildableStatusColor(
+        $buildable->getBuildableStatus()));
+      $item->addByline(HarbormasterBuildable::getBuildableStatusName(
+        $buildable->getBuildableStatus()));
 
       $list->addItem($item);
 
@@ -227,4 +217,5 @@ final class HarbormasterBuildableSearchEngine
 
     return $list;
   }
+
 }

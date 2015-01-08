@@ -13,7 +13,7 @@ final class PhabricatorAuthNeedsMultiFactorController
     $request = $this->getRequest();
     $viewer = $request->getUser();
 
-    $panel = id(new PhabricatorSettingsPanelMultiFactor())
+    $panel = id(new PhabricatorMultiFactorSettingsPanel())
       ->setUser($viewer)
       ->setViewer($viewer)
       ->setOverrideURI($this->getApplicationURI('/multifactor/'))
@@ -85,7 +85,6 @@ final class PhabricatorAuthNeedsMultiFactorController
       ),
       array(
         'title' => pht('Add Multi-Factor Authentication'),
-        'device' => true,
       ));
   }
 

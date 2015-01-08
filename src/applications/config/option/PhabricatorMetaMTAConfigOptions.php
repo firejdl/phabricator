@@ -100,6 +100,12 @@ SES will prevent delivery of any affected mail.
 EODOC
 ));
 
+    $email_preferences_description = $this->deformat(pht(<<<EODOC
+You can disable the email preference link in emails if users prefer smaller
+emails.
+EODOC
+));
+
     $re_prefix_description = $this->deformat(pht(<<<EODOC
 Mail.app on OS X Lion won't respect threading headers unless the subject is
 prefixed with "Re:". If you enable this option, Phabricator will add "Re:" to
@@ -257,6 +263,14 @@ EODOC
           ))
         ->setSummary(pht('Show "To:" and "Cc:" footer hints in email.'))
         ->setDescription($recipient_hints_description),
+      $this->newOption('metamta.email-preferences', 'bool', true)
+        ->setBoolOptions(
+          array(
+            pht('Show Email Preferences Link'),
+            pht('No Email Preferences Link'),
+          ))
+        ->setSummary(pht('Show email preferences link in email.'))
+        ->setDescription($email_preferences_description),
       $this->newOption('metamta.precedence-bulk', 'bool', false)
         ->setBoolOptions(
           array(
@@ -331,7 +345,7 @@ EODOC
             'in bytes.'))
         ->setSummary(pht('Global cap for size of generated emails (bytes).'))
         ->addExample(524288, pht('Truncate at 512KB'))
-        ->addExample(1048576, pht('Truncate at 1MB'))
+        ->addExample(1048576, pht('Truncate at 1MB')),
     );
   }
 

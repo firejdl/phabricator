@@ -49,7 +49,10 @@ final class PhabricatorMailManagementResendWorkflow
 
       $mailer_task = PhabricatorWorker::scheduleTask(
         'PhabricatorMetaMTAWorker',
-        $message->getID());
+        $message->getID(),
+        array(
+          'priority' => PhabricatorWorker::PRIORITY_ALERTS,
+        ));
 
       $console->writeOut(
         "Queued message #%d for resend.\n",

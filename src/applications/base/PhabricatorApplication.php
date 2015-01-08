@@ -6,10 +6,10 @@
  * @task  uri   URI Routing
  * @task  fact  Fact Integration
  * @task  meta  Application Management
- * @group apps
  */
-abstract class PhabricatorApplication
-  implements PhabricatorPolicyInterface {
+abstract class PhabricatorApplication implements PhabricatorPolicyInterface {
+
+  const MAX_STATUS_ITEMS      = 100;
 
   const GROUP_CORE            = 'core';
   const GROUP_UTILITIES       = 'util';
@@ -28,10 +28,7 @@ abstract class PhabricatorApplication
 
 /* -(  Application Information  )-------------------------------------------- */
 
-
-  public function getName() {
-    return substr(get_class($this), strlen('PhabricatorApplication'));
-  }
+  public abstract function getName();
 
   public function getShortDescription() {
     return $this->getName().' Application';
@@ -42,8 +39,8 @@ abstract class PhabricatorApplication
       return true;
     }
 
-    $beta = PhabricatorEnv::getEnvConfig('phabricator.show-beta-applications');
-    if (!$beta && $this->isBeta()) {
+    $prototypes = PhabricatorEnv::getEnvConfig('phabricator.show-prototypes');
+    if (!$prototypes && $this->isPrototype()) {
       return false;
     }
 
@@ -54,7 +51,7 @@ abstract class PhabricatorApplication
   }
 
 
-  public function isBeta() {
+  public function isPrototype() {
     return false;
   }
 
@@ -218,6 +215,22 @@ abstract class PhabricatorApplication
    */
   public function loadStatus(PhabricatorUser $user) {
     return array();
+  }
+
+  /**
+   * @return string
+   * @task ui
+   */
+  public static function formatStatusCount(
+    $count,
+    $limit_string = '%s',
+    $base_string = '%d') {
+    if ($count == self::MAX_STATUS_ITEMS) {
+      $count_str = pht($limit_string, ($count - 1).'+');
+    } else {
+      $count_str = pht($base_string, $count);
+    }
+    return $count_str;
   }
 
 

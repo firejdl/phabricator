@@ -3,8 +3,12 @@
 final class PhabricatorPeopleSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationPeople';
+  public function getResultTypeDescription() {
+    return pht('Users');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorPeopleApplication';
   }
 
   public function getCustomFieldObject() {
@@ -42,7 +46,7 @@ final class PhabricatorPeopleSearchEngine
     $can_browse = PhabricatorPolicyFilter::hasCapability(
       $viewer,
       $this->getApplication(),
-      PeopleCapabilityBrowseUserDirectory::CAPABILITY);
+      PeopleBrowseUserDirectoryCapability::CAPABILITY);
     if (!$can_browse) {
       $query->withPHIDs(array($viewer->getPHID()));
     }
@@ -159,7 +163,7 @@ final class PhabricatorPeopleSearchEngine
     return '/people/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
+  protected function getBuiltinQueryNames() {
     $names = array(
       'all' => pht('All'),
     );

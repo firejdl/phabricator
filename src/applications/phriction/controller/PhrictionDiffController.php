@@ -1,12 +1,12 @@
 <?php
 
-/**
- * @group phriction
- */
-final class PhrictionDiffController
-  extends PhrictionController {
+final class PhrictionDiffController extends PhrictionController {
 
   private $id;
+
+  public function shouldAllowPublic() {
+    return true;
+  }
 
   public function willProcessRequest(array $data) {
     $this->id = $data['id'];
@@ -208,7 +208,6 @@ final class PhrictionDiffController
       ),
       array(
         'title'     => pht('Document History'),
-        'device'    => true,
       ));
 
   }

@@ -5,6 +5,10 @@ final class PhrictionHistoryController
 
   private $slug;
 
+  public function shouldAllowPublic() {
+    return true;
+  }
+
   public function willProcessRequest(array $data) {
     $this->slug = $data['slug'];
   }
@@ -162,7 +166,6 @@ final class PhrictionHistoryController
       ),
       array(
         'title'     => pht('Document History'),
-        'device'    => true,
       ));
 
   }

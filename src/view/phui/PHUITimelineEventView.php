@@ -23,6 +23,7 @@ final class PHUITimelineEventView extends AphrontView {
   private $tokenRemoved;
   private $quoteTargetID;
   private $quoteRef;
+  private $reallyMajorEvent;
 
   public function setQuoteRef($quote_ref) {
     $this->quoteRef = $quote_ref;
@@ -148,7 +149,12 @@ final class PHUITimelineEventView extends AphrontView {
     return $this;
   }
 
-  public function setToken($token, $removed=false) {
+  public function setReallyMajorEvent($me) {
+    $this->reallyMajorEvent = $me;
+    return $this;
+  }
+
+  public function setToken($token, $removed = false) {
     $this->token = $token;
     $this->tokenRemoved = $removed;
     return $this;
@@ -255,7 +261,7 @@ final class PHUITimelineEventView extends AphrontView {
 
     if ($items || $has_menu) {
       $icon = id(new PHUIIconView())
-        ->setIconFont('fa-cog');
+        ->setIconFont('fa-caret-down');
       $aural = javelin_tag(
         'span',
         array(
@@ -401,20 +407,33 @@ final class PHUITimelineEventView extends AphrontView {
       );
     }
 
-    return javelin_tag(
-      'div',
-      array(
-        'class' => implode(' ', $outer_classes),
-        'id' => $this->anchor ? 'anchor-'.$this->anchor : null,
-        'sigil' => $sigil,
-        'meta' => $meta,
-      ),
-      phutil_tag(
+    $major_event = null;
+    if ($this->reallyMajorEvent) {
+      $major_event = phutil_tag(
         'div',
         array(
-          'class' => implode(' ', $classes),
+          'class' => 'phui-timeline-event-view '.
+                     'phui-timeline-spacer '.
+                     'phui-timeline-spacer-bold',
+        '',));
+    }
+
+    return array(
+      javelin_tag(
+        'div',
+        array(
+          'class' => implode(' ', $outer_classes),
+          'id' => $this->anchor ? 'anchor-'.$this->anchor : null,
+          'sigil' => $sigil,
+          'meta' => $meta,
         ),
-        $content));
+        phutil_tag(
+          'div',
+          array(
+            'class' => implode(' ', $classes),
+          ),
+          $content)),
+      $major_event,);
   }
 
   private function renderExtra(array $events) {
@@ -495,26 +514,26 @@ final class PHUITimelineEventView extends AphrontView {
     $xaction_phid = $this->getTransactionPHID();
 
     $items = array();
-    if ($this->getQuoteTargetID()) {
 
+    if ($this->getIsEditable()) {
+      $items[] = id(new PhabricatorActionView())
+        ->setIcon('fa-pencil')
+        ->setHref('/transactions/edit/'.$xaction_phid.'/')
+        ->setName(pht('Edit Comment'))
+        ->addSigil('transaction-edit')
+        ->setMetadata(
+          array(
+            'anchor' => $anchor,
+          ));
+    }
+
+    if ($this->getQuoteTargetID()) {
       $ref = null;
       if ($this->getQuoteRef()) {
         $ref = $this->getQuoteRef();
         if ($anchor) {
           $ref = $ref.'#'.$anchor;
         }
-      }
-
-      if ($this->getIsEditable()) {
-        $items[] = id(new PhabricatorActionView())
-          ->setIcon('fa-pencil')
-          ->setHref('/transactions/edit/'.$xaction_phid.'/')
-          ->setName(pht('Edit Comment'))
-          ->addSigil('transaction-edit')
-          ->setMetadata(
-            array(
-              'anchor' => $anchor,
-            ));
       }
 
       $items[] = id(new PhabricatorActionView())
@@ -528,6 +547,34 @@ final class PHUITimelineEventView extends AphrontView {
             'uri' => '/transactions/quote/'.$xaction_phid.'/',
             'ref' => $ref,
           ));
+
+      // if there is something to quote then there is something to view raw
+      $items[] = id(new PhabricatorActionView())
+        ->setIcon('fa-cutlery')
+        ->setHref('/transactions/raw/'.$xaction_phid.'/')
+        ->setName(pht('View Raw'))
+        ->addSigil('transaction-raw')
+        ->setMetadata(
+          array(
+            'anchor' => $anchor,
+          ));
+
+      $content_source = $this->getContentSource();
+      $source_email = PhabricatorContentSource::SOURCE_EMAIL;
+      if ($content_source->getSource() == $source_email) {
+        $source_id = $content_source->getParam('id');
+        if ($source_id) {
+          $items[] = id(new PhabricatorActionView())
+            ->setIcon('fa-envelope-o')
+            ->setHref('/transactions/raw/'.$xaction_phid.'/?email')
+            ->setName(pht('View Email Body'))
+            ->addSigil('transaction-raw')
+            ->setMetadata(
+              array(
+                'anchor' => $anchor,
+              ));
+        }
+      }
     }
 
     if ($this->getIsRemovable()) {

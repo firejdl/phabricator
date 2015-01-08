@@ -3,8 +3,12 @@
 final class HeraldTranscriptSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationHerald';
+  public function getResultTypeDescription() {
+    return pht('Herald Transcripts');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorHeraldApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -70,16 +74,13 @@ final class HeraldTranscriptSearchEngine
     return '/herald/transcript/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array();
-
-    $names['all'] = pht('All');
-
-    return $names;
+  protected function getBuiltinQueryNames() {
+    return array(
+      'all' => pht('All'),
+    );
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 

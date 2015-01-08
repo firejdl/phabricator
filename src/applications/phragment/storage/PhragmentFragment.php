@@ -14,12 +14,23 @@ final class PhragmentFragment extends PhragmentDAO
   public function getConfiguration() {
     return array(
       self::CONFIG_AUX_PHID => true,
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'path' => 'text128',
+        'depth' => 'uint32',
+        'latestVersionPHID' => 'phid?',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_path' => array(
+          'columns' => array('path'),
+          'unique' => true,
+        ),
+      ),
     ) + parent::getConfiguration();
   }
 
   public function generatePHID() {
     return PhabricatorPHID::generateNewPHID(
-      PhragmentPHIDTypeFragment::TYPECONST);
+      PhragmentFragmentPHIDType::TYPECONST);
   }
 
   public function getURI() {
@@ -119,7 +130,7 @@ final class PhragmentFragment extends PhragmentDAO
       $this->save();
     $this->saveTransaction();
 
-    $file->attachToObject($viewer, $version->getPHID());
+    $file->attachToObject($version->getPHID());
   }
 
   /**
@@ -158,7 +169,7 @@ final class PhragmentFragment extends PhragmentDAO
       $path = trim($zip->getNameIndex($i), '/');
       $stream = $zip->getStream($path);
       $data = null;
-      // If the stream is false, then it is a directory entry.  We leave
+      // If the stream is false, then it is a directory entry. We leave
       // $data set to null for directories so we know not to create a
       // version entry for them.
       if ($stream !== false) {
@@ -169,7 +180,7 @@ final class PhragmentFragment extends PhragmentDAO
     }
 
     // We need to detect any directories that are in the ZIP folder that
-    // aren't explicitly noted in the ZIP.  This can happen if the file
+    // aren't explicitly noted in the ZIP. This can happen if the file
     // entries in the ZIP look like:
     //
     //  * something/blah.png
@@ -204,7 +215,7 @@ final class PhragmentFragment extends PhragmentDAO
     }
 
     // FIXME: What happens when a child exists, but the current user
-    // can't see it.  We're going to create a new child with the exact
+    // can't see it. We're going to create a new child with the exact
     // same path and then bad things will happen.
     $children = id(new PhragmentFragmentQuery())
       ->setViewer($viewer)
@@ -237,7 +248,7 @@ final class PhragmentFragment extends PhragmentDAO
     // Iterate over the mappings to find new files.
     foreach ($mappings as $path => $data) {
       if (!array_key_exists($base_path.'/'.$path, $children)) {
-        // The file is being created.  If the data is null,
+        // The file is being created. If the data is null,
         // then this is explicitly a directory being created.
         $file = null;
         if ($mappings[$path] !== null) {

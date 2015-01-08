@@ -19,7 +19,7 @@ final class PhameBlogEditController
         ->withIDs(array($this->id))
         ->requireCapabilities(
           array(
-            PhabricatorPolicyCapability::CAN_EDIT
+            PhabricatorPolicyCapability::CAN_EDIT,
           ))
         ->executeOne();
       if (!$blog) {
@@ -96,7 +96,7 @@ final class PhameBlogEditController
           $blog->save();
           return id(new AphrontRedirectResponse())
             ->setURI($this->getApplicationURI('blog/view/'.$blog->getID().'/'));
-        } catch (AphrontQueryDuplicateKeyException $ex) {
+        } catch (AphrontDuplicateKeyQueryException $ex) {
           $errors[] = pht('Domain must be unique.');
           $e_custom_domain = pht('Not Unique');
         }
@@ -122,12 +122,13 @@ final class PhameBlogEditController
         ->setError($e_name))
       ->appendChild(
         id(new PhabricatorRemarkupControl())
-        ->setLabel(pht('Description'))
-        ->setName('description')
-        ->setValue($blog->getDescription())
-        ->setID('blog-description')
-        ->setUser($user)
-        ->setDisableMacros(true))
+          ->setUser($user)
+          ->setLabel(pht('Description'))
+          ->setName('description')
+          ->setValue($blog->getDescription())
+          ->setID('blog-description')
+          ->setUser($user)
+          ->setDisableMacros(true))
       ->appendChild(
         id(new AphrontFormPolicyControl())
           ->setUser($user)
@@ -188,7 +189,6 @@ final class PhameBlogEditController
       $nav,
       array(
         'title' => $page_title,
-        'device' => true,
       ));
   }
 }

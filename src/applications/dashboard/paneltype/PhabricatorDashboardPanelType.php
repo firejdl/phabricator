@@ -12,6 +12,13 @@ abstract class PhabricatorDashboardPanelType extends Phobject {
     PhabricatorDashboardPanel $panel,
     PhabricatorDashboardPanelRenderingEngine $engine);
 
+  public function initializeFieldsFromRequest(
+    PhabricatorDashboardPanel $panel,
+    PhabricatorCustomFieldList $field_list,
+    AphrontRequest $request) {
+    return;
+  }
+
   /**
    * Should this panel pull content in over AJAX?
    *
@@ -28,6 +35,14 @@ abstract class PhabricatorDashboardPanelType extends Phobject {
    */
   public function shouldRenderAsync() {
     return true;
+  }
+
+  public function adjustPanelHeader(
+    PhabricatorUser $viewer,
+    PhabricatorDashboardPanel $panel,
+    PhabricatorDashboardPanelRenderingEngine $engine,
+    PHUIActionHeaderView $header) {
+    return $header;
   }
 
   public static function getAllPanelTypes() {

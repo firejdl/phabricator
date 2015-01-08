@@ -7,7 +7,7 @@ final class PholioTransaction extends PhabricatorApplicationTransaction {
   }
 
   public function getApplicationTransactionType() {
-    return PholioPHIDTypeMock::TYPECONST;
+    return PholioMockPHIDType::TYPECONST;
   }
 
   public function getApplicationTransactionCommentObject() {
@@ -77,6 +77,32 @@ final class PholioTransaction extends PhabricatorApplicationTransaction {
     }
 
     return parent::getIcon();
+  }
+
+  public function getMailTags() {
+    $tags = array();
+    switch ($this->getTransactionType()) {
+      case PholioTransactionType::TYPE_INLINE:
+      case PhabricatorTransactions::TYPE_COMMENT:
+        $tags[] = MetaMTANotificationType::TYPE_PHOLIO_COMMENT;
+        break;
+      case PholioTransactionType::TYPE_STATUS:
+        $tags[] = MetaMTANotificationType::TYPE_PHOLIO_STATUS;
+        break;
+      case PholioTransactionType::TYPE_NAME:
+      case PholioTransactionType::TYPE_DESCRIPTION:
+      case PholioTransactionType::TYPE_IMAGE_NAME:
+      case PholioTransactionType::TYPE_IMAGE_DESCRIPTION:
+      case PholioTransactionType::TYPE_IMAGE_SEQUENCE:
+      case PholioTransactionType::TYPE_IMAGE_FILE:
+      case PholioTransactionType::TYPE_IMAGE_REPLACE:
+        $tags[] = MetaMTANotificationType::TYPE_PHOLIO_UPDATED;
+        break;
+      default:
+        $tags[] = MetaMTANotificationType::TYPE_PHOLIO_OTHER;
+        break;
+    }
+    return $tags;
   }
 
   public function getTitle() {
@@ -183,7 +209,7 @@ final class PholioTransaction extends PhabricatorApplicationTransaction {
     return parent::getTitle();
   }
 
-  public function getTitleForFeed(PhabricatorFeedStory $story) {
+  public function getTitleForFeed() {
     $author_phid = $this->getAuthorPHID();
     $object_phid = $this->getObjectPHID();
 
@@ -252,7 +278,7 @@ final class PholioTransaction extends PhabricatorApplicationTransaction {
         break;
     }
 
-    return parent::getTitleForFeed($story);
+    return parent::getTitleForFeed();
   }
 
   public function getBodyForFeed(PhabricatorFeedStory $story) {
@@ -271,7 +297,9 @@ final class PholioTransaction extends PhabricatorApplicationTransaction {
 
     if ($text) {
       return phutil_escape_html_newlines(
-        phutil_utf8_shorten($text, 128));
+        id(new PhutilUTF8StringTruncator())
+        ->setMaximumGlyphs(128)
+        ->truncateString($text));
     }
 
     return parent::getBodyForFeed($story);

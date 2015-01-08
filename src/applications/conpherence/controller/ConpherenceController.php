@@ -1,12 +1,10 @@
 <?php
 
-/**
- * @group conpherence
- */
 abstract class ConpherenceController extends PhabricatorController {
+
   private $conpherences;
 
-  public function buildApplicationMenu() {
+  protected function buildApplicationMenu() {
     $nav = new PHUIListView();
 
     $nav->newLink(
@@ -32,7 +30,7 @@ abstract class ConpherenceController extends PhabricatorController {
     return $nav;
   }
 
-  public function buildApplicationCrumbs() {
+  protected function buildApplicationCrumbs() {
     $crumbs = parent::buildApplicationCrumbs();
 
     $crumbs
@@ -72,10 +70,11 @@ abstract class ConpherenceController extends PhabricatorController {
         phutil_tag(
           'div',
           array(
-            'class' => 'header-loading-mask'
+            'class' => 'header-loading-mask',
           ),
           ''),
-        $crumbs));
+        $crumbs,
+      ));
   }
 
   protected function renderConpherenceTransactions(
@@ -149,8 +148,8 @@ abstract class ConpherenceController extends PhabricatorController {
     return array(
       'transactions' => $rendered_transactions,
       'latest_transaction_id' => $latest_transaction_id,
-      'oldest_transaction_id' => $oldest_transaction_id
+      'oldest_transaction_id' => $oldest_transaction_id,
     );
-
   }
+
 }

@@ -73,7 +73,6 @@ final class PhabricatorCalendarViewController
      $nav,
      array(
         'title' => pht('Calendar'),
-        'device' => true,
       ));
   }
 
@@ -104,7 +103,8 @@ final class PhabricatorCalendarViewController
             phutil_tag(
               'a',
               array(
-                'href' => $login_uri),
+                'href' => $login_uri,
+              ),
               pht('Log in'))));
     }
 

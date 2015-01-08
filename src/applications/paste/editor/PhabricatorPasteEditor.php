@@ -5,6 +5,14 @@ final class PhabricatorPasteEditor
 
   private $pasteFile;
 
+  public function getEditorApplicationClass() {
+    return 'PhabricatorPasteApplication';
+  }
+
+  public function getEditorObjectsDescription() {
+    return pht('Pastes');
+  }
+
   public static function initializeFileForPaste(
     PhabricatorUser $actor,
     $name,
@@ -17,6 +25,7 @@ final class PhabricatorPasteEditor
         'mime-type' => 'text/plain; charset=utf-8',
         'authorPHID' => $actor->getPHID(),
         'viewPolicy' => PhabricatorPolicies::POLICY_NOONE,
+        'editPolicy' => PhabricatorPolicies::POLICY_NOONE,
       ));
   }
 
@@ -27,6 +36,7 @@ final class PhabricatorPasteEditor
     $types[] = PhabricatorPasteTransaction::TYPE_TITLE;
     $types[] = PhabricatorPasteTransaction::TYPE_LANGUAGE;
     $types[] = PhabricatorTransactions::TYPE_VIEW_POLICY;
+    $types[] = PhabricatorTransactions::TYPE_EDIT_POLICY;
     $types[] = PhabricatorTransactions::TYPE_COMMENT;
 
     return $types;
@@ -75,6 +85,9 @@ final class PhabricatorPasteEditor
       case PhabricatorTransactions::TYPE_VIEW_POLICY:
         $object->setViewPolicy($xaction->getNewValue());
         return;
+      case PhabricatorTransactions::TYPE_EDIT_POLICY:
+        $object->setEditPolicy($xaction->getNewValue());
+        return;
       case PhabricatorTransactions::TYPE_COMMENT:
       case PhabricatorTransactions::TYPE_SUBSCRIBERS:
       case PhabricatorTransactions::TYPE_EDGE:
@@ -93,6 +106,7 @@ final class PhabricatorPasteEditor
       case PhabricatorPasteTransaction::TYPE_TITLE:
       case PhabricatorPasteTransaction::TYPE_LANGUAGE:
       case PhabricatorTransactions::TYPE_VIEW_POLICY:
+      case PhabricatorTransactions::TYPE_EDIT_POLICY:
       case PhabricatorTransactions::TYPE_COMMENT:
       case PhabricatorTransactions::TYPE_SUBSCRIBERS:
       case PhabricatorTransactions::TYPE_EDGE:
@@ -159,7 +173,7 @@ final class PhabricatorPasteEditor
 
     $body = parent::buildMailBody($object, $xactions);
 
-    $body->addTextSection(
+    $body->addLinkSection(
       pht('PASTE DETAIL'),
       PhabricatorEnv::getProductionURI('/P'.$object->getID()));
 

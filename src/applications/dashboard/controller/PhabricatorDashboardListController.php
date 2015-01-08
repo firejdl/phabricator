@@ -5,13 +5,16 @@ final class PhabricatorDashboardListController
 
   private $queryKey;
 
+  public function shouldAllowPublic() {
+    return true;
+  }
+
   public function willProcessRequest(array $data) {
     $this->queryKey = idx($data, 'queryKey');
   }
 
   public function processRequest() {
-    $request = $this->getRequest();
-    $controller = id(new PhabricatorApplicationSearchController($request))
+    $controller = id(new PhabricatorApplicationSearchController())
       ->setQueryKey($this->queryKey)
       ->setSearchEngine(new PhabricatorDashboardSearchEngine())
       ->setNavigation($this->buildSideNavView());
@@ -36,7 +39,7 @@ final class PhabricatorDashboardListController
     return $nav;
   }
 
-  public function buildApplicationCrumbs() {
+  protected function buildApplicationCrumbs() {
     $crumbs = parent::buildApplicationCrumbs();
 
     $crumbs->addAction(

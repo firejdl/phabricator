@@ -1,7 +1,8 @@
 {
   "exclude": [
     "(^externals/)",
-    "(\\.lint-test$)"
+    "(^webroot/rsrc/externals/)",
+    "(/__tests__/data/)"
   ],
   "linters": {
     "chmod": {
@@ -10,32 +11,50 @@
     "filename": {
       "type": "filename"
     },
+    "generated": {
+      "type": "generated"
+    },
     "javelin": {
       "type": "javelin",
       "include": "(\\.js$)",
       "exclude": [
-        "(^externals/JsShrink/)",
-        "(^support/aphlict/)",
-        "(^webroot/rsrc/externals/raphael/)"
+        "(^support/aphlict/)"
       ]
     },
-    "jshint": {
+    "jshint-browser": {
       "type": "jshint",
       "include": "(\\.js$)",
       "exclude": [
-        "(^externals/JsShrink/)",
-        "(^webroot/rsrc/externals/raphael/)"
+        "(^support/aphlict/server/.*\\.js$)"
       ],
-      "flags": ["--config=support/jshint/jshintconfig"]
+      "jshint.jshintrc": "support/lint/browser.jshintrc"
     },
-    "generated": {
-      "type": "generated"
+    "jshint-node": {
+      "type": "jshint",
+      "include": [
+        "(^support/aphlict/server/.*\\.js$)"
+      ],
+      "jshint.jshintrc": "support/lint/node.jshintrc"
+    },
+    "json": {
+      "type": "json",
+      "include": [
+        "(^src/docs/book/.*\\.book$)",
+        "(^support/lint/jshintrc$)",
+        "(^\\.arcconfig$)",
+        "(^\\.arclint$)",
+        "(\\.json$)"
+      ]
     },
     "merge-conflict": {
       "type": "merge-conflict"
     },
     "nolint": {
       "type": "nolint"
+    },
+    "phutil-library": {
+      "type": "phutil-library",
+      "include": "(\\.php$)"
     },
     "phutil-xhpast": {
       "type": "phutil-xhpast",
@@ -44,14 +63,14 @@
         "phutil_escape_html": "The phutil_escape_html() function is deprecated. Raw strings passed to phutil_tag() or hsprintf() are escaped automatically."
       }
     },
-    "phutil-library": {
-      "type": "phutil-library",
-      "include": "(\\.php$)"
+    "spelling": {
+      "type": "spelling"
     },
     "text": {
       "type": "text",
       "exclude": [
-        "(^\\.arclint)"
+        "(^\\.arclint)",
+        "(^resources/sql/quickstart.sql)"
       ]
     },
     "text-without-length": {
@@ -60,23 +79,22 @@
         "3": "disabled"
       },
       "include": [
-        "(^\\.arclint)"
+        "(^\\.arclint)",
+        "(^resources/sql/quickstart.sql)"
       ]
-    },
-    "spelling": {
-      "type": "spelling"
     },
     "xhpast": {
       "type": "xhpast",
       "include": "(\\.php$)",
       "severity": {
         "16": "advice",
-        "29": "warning",
-        "31": "error",
-        "34": "error",
-        "35": "error"
+        "34": "error"
       },
-      "xhpast.naminghook": "PhabricatorSymbolNameLinter"
+      "xhpast.blacklisted.function": {
+        "eval": "The eval() function should be avoided. It is potentially unsafe and makes debugging more difficult."
+      },
+      "xhpast.php-version": "5.2.3",
+      "xhpast.php-version.windows": "5.3.0"
     }
   }
 }

@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group conpherence
- */
 final class ConpherenceMenuItemView extends AphrontTagView {
 
   private $title;
@@ -80,7 +77,7 @@ final class ConpherenceMenuItemView extends AphrontTagView {
         'span',
         array(
           'class' => 'conpherence-menu-item-image',
-          'style' => 'background-image: url('.$this->imageURI.');'
+          'style' => 'background-image: url('.$this->imageURI.');',
         ),
         '');
     }
@@ -107,7 +104,7 @@ final class ConpherenceMenuItemView extends AphrontTagView {
       $unread_count = phutil_tag(
         'span',
         array(
-          'class' => 'conpherence-menu-item-unread-count'
+          'class' => 'conpherence-menu-item-unread-count',
         ),
         (int)$this->unreadCount);
     }
@@ -119,4 +116,5 @@ final class ConpherenceMenuItemView extends AphrontTagView {
       $unread_count,
     );
   }
+
 }

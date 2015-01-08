@@ -3,8 +3,12 @@
 final class PassphraseCredentialSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationPassphrase';
+  public function getResultTypeDescription() {
+    return pht('Passphrase Credentials');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorPassphraseApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -13,6 +17,7 @@ final class PassphraseCredentialSearchEngine
     $saved->setParameter(
       'isDestroyed',
       $this->readBoolFromRequest($request, 'isDestroyed'));
+    $saved->setParameter('name', $request->getStr('name'));
 
     return $saved;
   }
@@ -25,6 +30,11 @@ final class PassphraseCredentialSearchEngine
       $query->withIsDestroyed($destroyed);
     }
 
+    $name = $saved->getParameter('name');
+    if (strlen($name)) {
+      $query->withNameContains($name);
+    }
+
     return $query;
   }
 
@@ -32,7 +42,10 @@ final class PassphraseCredentialSearchEngine
     AphrontFormView $form,
     PhabricatorSavedQuery $saved_query) {
 
-    $form->appendChild(
+    $name = $saved_query->getParameter('name');
+
+    $form
+      ->appendChild(
       id(new AphrontFormSelectControl())
         ->setName('isDestroyed')
         ->setLabel(pht('Status'))
@@ -42,25 +55,26 @@ final class PassphraseCredentialSearchEngine
             '' => pht('Show All Credentials'),
             'false' => pht('Show Only Active Credentials'),
             'true' => pht('Show Only Destroyed Credentials'),
-          )));
-
+          )))
+      ->appendChild(
+        id(new AphrontFormTextControl())
+          ->setName('name')
+          ->setLabel(pht('Name Contains'))
+          ->setValue($name));
   }
 
   protected function getURI($path) {
     return '/passphrase/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array(
+  protected function getBuiltinQueryNames() {
+    return array(
       'active' => pht('Active Credentials'),
       'all' => pht('All Credentials'),
     );
-
-    return $names;
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 
@@ -111,6 +125,5 @@ final class PassphraseCredentialSearchEngine
 
     return $list;
   }
-
 
 }

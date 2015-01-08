@@ -5,6 +5,10 @@ final class PhrictionDocumentController
 
   private $slug;
 
+  public function shouldAllowPublic() {
+    return true;
+  }
+
   public function willProcessRequest(array $data) {
     $this->slug = $data['slug'];
   }
@@ -34,18 +38,8 @@ final class PhrictionDocumentController
 
     if (!$document) {
 
-      $document = new PhrictionDocument();
+      $document = PhrictionDocument::initializeNewDocument($user, $slug);
 
-      if (PhrictionDocument::isProjectSlug($slug)) {
-        $project = id(new PhabricatorProjectQuery())
-          ->setViewer($user)
-          ->withPhrictionSlugs(array(
-            PhrictionDocument::getProjectSlugIdentifier($slug)))
-          ->executeOne();
-        if (!$project) {
-          return new Aphront404Response();
-        }
-      }
       $create_uri = '/phriction/edit/?slug='.$slug;
 
       $notice = new AphrontErrorView();
@@ -198,6 +192,8 @@ final class PhrictionDocumentController
     }
 
     $header = id(new PHUIHeaderView())
+      ->setUser($user)
+      ->setPolicyObject($document)
       ->setHeader($page_title);
 
     $prop_list = null;
@@ -208,6 +204,7 @@ final class PhrictionDocumentController
 
     $page_content = id(new PHUIDocumentView())
       ->setOffset(true)
+      ->setFontKit(PHUIDocumentView::FONT_SOURCE_SANS)
       ->setHeader($header)
       ->appendChild(
         array(
@@ -221,7 +218,7 @@ final class PhrictionDocumentController
     $core_page = phutil_tag(
       'div',
         array(
-          'class' => 'phriction-offset'
+          'class' => 'phriction-offset',
         ),
         array(
           $page_content,
@@ -236,7 +233,6 @@ final class PhrictionDocumentController
       array(
         'pageObjects' => array($document->getPHID()),
         'title'   => $page_title,
-        'device'  => true,
       ));
 
   }
@@ -251,32 +247,9 @@ final class PhrictionDocumentController
       ->setUser($viewer)
       ->setObject($document);
 
-    $project_phid = null;
-    if (PhrictionDocument::isProjectSlug($slug)) {
-      $project = id(new PhabricatorProjectQuery())
-        ->setViewer($viewer)
-        ->withPhrictionSlugs(array(
-          PhrictionDocument::getProjectSlugIdentifier($slug)))
-        ->executeOne();
-      if ($project) {
-        $project_phid = $project->getPHID();
-      }
-    }
-
-    $phids = array_filter(
-      array(
-        $content->getAuthorPHID(),
-        $project_phid,
-      ));
+    $phids = array($content->getAuthorPHID());
 
     $this->loadHandles($phids);
-
-    $project_info = null;
-    if ($project_phid) {
-      $view->addProperty(
-        pht('Project Info'),
-        $this->getHandle($project_phid)->renderLink());
-    }
 
     $view->addProperty(
       pht('Last Author'),
@@ -350,57 +323,24 @@ final class PhrictionDocumentController
   }
 
   private function renderDocumentChildren($slug) {
-    $document_dao = new PhrictionDocument();
-    $content_dao = new PhrictionContent();
-    $conn = $document_dao->establishConnection('r');
 
-    $depth = PhabricatorEnv::getEnvConfig('phriction.hierarchy-display-levels');
-
-    if ($depth == 0) {
-      return;
-    }
-
-    $limit = 250;
     $d_child = PhabricatorSlug::getDepth($slug) + 1;
+    $d_grandchild = PhabricatorSlug::getDepth($slug) + 2;
+    $limit = 250;
 
-    // Select children and grandchildren.
-    if ($depth == -1) {
-      $children = queryfx_all(
-        $conn,
-        'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
-          ON d.contentID = c.id
-          WHERE d.slug LIKE %> AND d.depth >= %d
-            AND d.status IN (%Ld)
-          ORDER BY d.depth, c.title LIMIT %d',
-        $document_dao->getTableName(),
-        $content_dao->getTableName(),
-        ($slug == '/' ? '' : $slug),
-        $d_child,
-        array(
-          PhrictionDocumentStatus::STATUS_EXISTS,
-          PhrictionDocumentStatus::STATUS_STUB,
-        ),
-        $limit);
-    } else {
-      $d_total = PhabricatorSlug::getDepth($slug) + $depth;
-      $children = queryfx_all(
-        $conn,
-        'SELECT d.slug, d.depth, c.title FROM %T d JOIN %T c
-          ON d.contentID = c.id
-          WHERE d.slug LIKE %> AND d.depth IN (%Ld)
-            AND d.status IN (%Ld)
-          ORDER BY d.depth, c.title LIMIT %d',
-        $document_dao->getTableName(),
-        $content_dao->getTableName(),
-        ($slug == '/' ? '' : $slug),
-        range($d_child, $d_total),
-        array(
-          PhrictionDocumentStatus::STATUS_EXISTS,
-          PhrictionDocumentStatus::STATUS_STUB,
-        ),
-        $limit);
-    }
+    $query = id(new PhrictionDocumentQuery())
+      ->setViewer($this->getRequest()->getUser())
+      ->withDepths(array($d_child, $d_grandchild))
+      ->withSlugPrefix($slug == '/' ? '' : $slug)
+      ->withStatuses(array(
+        PhrictionDocumentStatus::STATUS_EXISTS,
+        PhrictionDocumentStatus::STATUS_STUB,
+      ))
+      ->setLimit($limit)
+      ->setOrder(PhrictionDocumentQuery::ORDER_HIERARCHY)
+      ->needContent(true);
 
+    $children = $query->execute();
     if (!$children) {
       return;
     }
@@ -421,7 +361,7 @@ final class PhrictionDocumentController
     if (count($children) == $limit) {
       $more_children = true;
       foreach ($children as $child) {
-        if ($child['depth'] > $d_child) {
+        if ($child->getDepth() == $d_grandchild) {
           $more_children = false;
         }
       }
@@ -431,23 +371,56 @@ final class PhrictionDocumentController
       $more_children = false;
     }
 
-    $grandchildren = array();
+    $children_dicts = array();
+    $grandchildren_dicts = array();
     foreach ($children as $key => $child) {
-      if ($child['depth'] == $d_child) {
+      $child_dict = array(
+        'slug' => $child->getSlug(),
+        'depth' => $child->getDepth(),
+        'title' => $child->getContent()->getTitle(),);
+      if ($child->getDepth() == $d_child) {
+        $children_dicts[] = $child_dict;
         continue;
       } else {
         unset($children[$key]);
         if ($show_grandchildren) {
-          $ancestors = PhabricatorSlug::getAncestry($child['slug']);
-          $grandchildren[end($ancestors)][] = $child;
+          $ancestors = PhabricatorSlug::getAncestry($child->getSlug());
+          $grandchildren_dicts[end($ancestors)][] = $child_dict;
         }
       }
     }
 
-    $children = isort($children, 'title');
+    // Fill in any missing children.
+    $known_slugs = mpull($children, null, 'getSlug');
+    foreach ($grandchildren_dicts as $slug => $ignored) {
+      if (empty($known_slugs[$slug])) {
+        $children_dicts[] = array(
+          'slug'    => $slug,
+          'depth'   => $d_child,
+          'title'   => PhabricatorSlug::getDefaultTitle($slug),
+          'empty'   => true,
+        );
+      }
+    }
 
-    $list = $this->renderDescendents($children, $grandchildren, $d_child);
+    $children_dicts = isort($children_dicts, 'title');
 
+    $list = array();
+    foreach ($children_dicts as $child) {
+      $list[] = hsprintf('<li>');
+      $list[] = $this->renderChildDocumentLink($child);
+      $grand = idx($grandchildren_dicts, $child['slug'], array());
+      if ($grand) {
+        $list[] = hsprintf('<ul>');
+        foreach ($grand as $grandchild) {
+          $list[] = hsprintf('<li>');
+          $list[] = $this->renderChildDocumentLink($grandchild);
+          $list[] = hsprintf('</li>');
+        }
+        $list[] = hsprintf('</ul>');
+      }
+      $list[] = hsprintf('</li>');
+    }
     if ($more_children) {
       $list[] = phutil_tag('li', array(), pht('More...'));
     }
@@ -471,31 +444,6 @@ final class PhrictionDocumentController
     return id(new PHUIDocumentView())
       ->setOffset(true)
       ->appendChild($content);
-  }
-
-  private function renderDescendents(
-    $children,
-    $grandchildren,
-    $current_depth) {
-
-    $list = array();
-    foreach ($children as $child) {
-      if ($child['depth'] != $current_depth) {
-        continue;
-      }
-      $list[] = hsprintf('<li>');
-      $list[] = $this->renderChildDocumentLink($child);
-      $grand = idx($grandchildren, $child['slug'], array());
-      if ($grand) {
-        $list[] = hsprintf('<ul>');
-        $list = array_merge($list,
-          $this->renderDescendents($grand, $grandchildren, $current_depth + 1));
-        $list[] = hsprintf('</ul>');
-      }
-      $list[] = hsprintf('</li>');
-    }
-
-    return $list;
   }
 
   private function renderChildDocumentLink(array $info) {

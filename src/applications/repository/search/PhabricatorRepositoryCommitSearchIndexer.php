@@ -30,7 +30,7 @@ final class PhabricatorRepositoryCommitSearchIndexer
 
     $doc = new PhabricatorSearchAbstractDocument();
     $doc->setPHID($commit->getPHID());
-    $doc->setDocumentType(PhabricatorRepositoryPHIDTypeCommit::TYPECONST);
+    $doc->setDocumentType(PhabricatorRepositoryCommitPHIDType::TYPECONST);
     $doc->setDocumentCreated($date_created);
     $doc->setDocumentModified($date_created);
     $doc->setDocumentTitle($title);
@@ -43,50 +43,20 @@ final class PhabricatorRepositoryCommitSearchIndexer
       $doc->addRelationship(
         PhabricatorSearchRelationship::RELATIONSHIP_AUTHOR,
         $author_phid,
-        PhabricatorPeoplePHIDTypeUser::TYPECONST,
+        PhabricatorPeopleUserPHIDType::TYPECONST,
         $date_created);
-    }
-
-    $project_phids = PhabricatorEdgeQuery::loadDestinationPHIDs(
-      $commit->getPHID(),
-      PhabricatorEdgeConfig::TYPE_COMMIT_HAS_PROJECT);
-    if ($project_phids) {
-      foreach ($project_phids as $project_phid) {
-        $doc->addRelationship(
-          PhabricatorSearchRelationship::RELATIONSHIP_PROJECT,
-          $project_phid,
-          PhabricatorProjectPHIDTypeProject::TYPECONST,
-          $date_created);
-      }
     }
 
     $doc->addRelationship(
       PhabricatorSearchRelationship::RELATIONSHIP_REPOSITORY,
       $repository->getPHID(),
-      PhabricatorRepositoryPHIDTypeRepository::TYPECONST,
+      PhabricatorRepositoryRepositoryPHIDType::TYPECONST,
       $date_created);
 
-    $comments = id(new PhabricatorAuditComment())->loadAllWhere(
-      'targetPHID = %s',
-      $commit->getPHID());
-    foreach ($comments as $comment) {
-      if (strlen($comment->getContent())) {
-        $doc->addField(
-          PhabricatorSearchField::FIELD_COMMENT,
-          $comment->getContent());
-      }
-    }
-
-    $inlines = id(new PhabricatorAuditInlineComment())->loadAllWhere(
-      'commitPHID = %s AND (auditCommentID IS NOT NULL)',
-      $commit->getPHID());
-    foreach ($inlines as $inline) {
-      if (strlen($inline->getContent())) {
-        $doc->addField(
-          PhabricatorSearchField::FIELD_COMMENT,
-          $inline->getContent());
-      }
-    }
+    $this->indexTransactions(
+      $doc,
+      new PhabricatorAuditTransactionQuery(),
+      array($commit->getPHID()));
 
     return $doc;
   }

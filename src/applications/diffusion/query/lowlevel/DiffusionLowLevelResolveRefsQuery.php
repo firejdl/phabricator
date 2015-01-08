@@ -135,12 +135,6 @@ final class DiffusionLowLevelResolveRefsQuery
 
     $futures = array();
     foreach ($this->refs as $ref) {
-      // TODO: There was a note about `--rev 'a b'` not working for branches
-      // with spaces in their names in older code, but I suspect this was
-      // misidentified and resulted from the branch name being interpeted as
-      // a revset. Use hgsprintf() to avoid that. If this doesn't break for a
-      // bit, remove this comment. Otherwise, consider `-b %s --limit 1`.
-
       $futures[$ref] = $repository->getLocalCommandFuture(
         'log --template=%s --rev %s',
         '{node}',
@@ -148,7 +142,7 @@ final class DiffusionLowLevelResolveRefsQuery
     }
 
     $results = array();
-    foreach (Futures($futures) as $ref => $future) {
+    foreach (new FutureIterator($futures) as $ref => $future) {
       try {
         list($stdout) = $future->resolvex();
       } catch (CommandException $ex) {

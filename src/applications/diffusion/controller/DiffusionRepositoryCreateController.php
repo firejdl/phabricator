@@ -20,6 +20,7 @@ final class DiffusionRepositoryCreateController
     // the latter two cases, we show only a few of the pages.
 
     $repository = null;
+    $service = null;
     switch ($this->edit) {
       case 'remote':
       case 'policy':
@@ -38,7 +39,39 @@ final class DiffusionRepositoryCreateController
       case 'import':
       case 'create':
         $this->requireApplicationCapability(
-          DiffusionCapabilityCreateRepositories::CAPABILITY);
+          DiffusionCreateRepositoriesCapability::CAPABILITY);
+
+        // Pick a random open service to allocate this repository on, if any
+        // exist. If there are no services, we aren't in cluster mode and
+        // will allocate locally. If there are services but none permit
+        // allocations, we fail.
+        $services = id(new AlmanacServiceQuery())
+          ->setViewer(PhabricatorUser::getOmnipotentUser())
+          ->withServiceClasses(
+            array(
+              'AlmanacClusterRepositoryServiceType',
+            ))
+          ->execute();
+        if ($services) {
+          // Filter out services which do not permit new allocations.
+          foreach ($services as $key => $possible_service) {
+            if ($possible_service->getAlmanacPropertyValue('closed')) {
+              unset($services[$key]);
+            }
+          }
+
+          if (!$services) {
+            throw new Exception(
+              pht(
+                'This install is configured in cluster mode, but all '.
+                'available repository cluster services are closed to new '.
+                'allocations. At least one service must be open to allow '.
+                'new allocations to take place.'));
+          }
+
+          shuffle($services);
+          $service = head($services);
+        }
 
         $cancel_uri = $this->getApplicationURI('new/');
         break;
@@ -104,10 +137,13 @@ final class DiffusionRepositoryCreateController
         $type_local_path = PhabricatorRepositoryTransaction::TYPE_LOCAL_PATH;
         $type_remote_uri = PhabricatorRepositoryTransaction::TYPE_REMOTE_URI;
         $type_hosting = PhabricatorRepositoryTransaction::TYPE_HOSTING;
+        $type_http = PhabricatorRepositoryTransaction::TYPE_PROTOCOL_HTTP;
+        $type_ssh = PhabricatorRepositoryTransaction::TYPE_PROTOCOL_SSH;
         $type_credential = PhabricatorRepositoryTransaction::TYPE_CREDENTIAL;
         $type_view = PhabricatorTransactions::TYPE_VIEW_POLICY;
         $type_edit = PhabricatorTransactions::TYPE_EDIT_POLICY;
         $type_push = PhabricatorRepositoryTransaction::TYPE_PUSH_POLICY;
+        $type_service = PhabricatorRepositoryTransaction::TYPE_SERVICE;
 
         $xactions = array();
 
@@ -139,8 +175,13 @@ final class DiffusionRepositoryCreateController
             ->getControl('activate')->getValue();
           $xactions[] = id(clone $template)
             ->setTransactionType($type_activate)
-            ->setNewValue(
-              ($activate == 'start'));
+            ->setNewValue(($activate == 'start'));
+
+          if ($service) {
+            $xactions[] = id(clone $template)
+              ->setTransactionType($type_service)
+              ->setNewValue($service->getPHID());
+          }
 
           $default_local_path = PhabricatorEnv::getEnvConfig(
             'repository.default-local-path');
@@ -157,6 +198,26 @@ final class DiffusionRepositoryCreateController
           $xactions[] = id(clone $template)
             ->setTransactionType($type_hosting)
             ->setNewValue(true);
+          $vcs = $form->getPage('vcs')->getControl('vcs')->getValue();
+          if ($vcs != PhabricatorRepositoryType::REPOSITORY_TYPE_SVN) {
+            if (PhabricatorEnv::getEnvConfig('diffusion.allow-http-auth')) {
+              $v_http_mode = PhabricatorRepository::SERVE_READWRITE;
+            } else {
+              $v_http_mode = PhabricatorRepository::SERVE_OFF;
+            }
+            $xactions[] = id(clone $template)
+              ->setTransactionType($type_http)
+              ->setNewValue($v_http_mode);
+          }
+
+          if (PhabricatorEnv::getEnvConfig('diffusion.ssh-user')) {
+            $v_ssh_mode = PhabricatorRepository::SERVE_READWRITE;
+          } else {
+            $v_ssh_mode = PhabricatorRepository::SERVE_OFF;
+          }
+          $xactions[] = id(clone $template)
+            ->setTransactionType($type_ssh)
+            ->setNewValue($v_ssh_mode);
         }
 
         if ($is_auth) {
@@ -224,7 +285,6 @@ final class DiffusionRepositoryCreateController
       ),
       array(
         'title' => $title,
-        'device' => true,
       ));
   }
 
@@ -446,7 +506,6 @@ final class DiffusionRepositoryCreateController
         "| ----------------------- |\n".
         "| `git@github.com:example/example.git` |\n".
         "| `ssh://user@host.com/git/example.git` |\n".
-        "| `file:///local/path/to/repo` |\n".
         "| `https://example.com/repository.git` |\n");
     } else if ($is_mercurial) {
       $uri_label = pht('Remote URI');
@@ -457,7 +516,7 @@ final class DiffusionRepositoryCreateController
         "| Example Mercurial Remote URIs |\n".
         "| ----------------------- |\n".
         "| `ssh://hg@bitbucket.org/example/repository` |\n".
-        "| `file:///local/path/to/repo` |\n");
+        "| `https://bitbucket.org/example/repository` |\n");
     } else if ($is_svn) {
       $uri_label = pht('Repository Root');
       $instructions = pht(
@@ -471,7 +530,6 @@ final class DiffusionRepositoryCreateController
         "| `http://svn.example.org/svnroot/` |\n".
         "| `svn+ssh://svn.example.com/svnroot/` |\n".
         "| `svn://svn.example.net/svnroot/` |\n".
-        "| `file:///local/path/to/svnroot/` |\n".
         "\n\n".
         "You **MUST** specify the root of the repository, not a ".
         "subdirectory. (If you want to import only part of a Subversion ".
@@ -494,52 +552,11 @@ final class DiffusionRepositoryCreateController
       $page->addPageError(
         pht('You must specify a URI.'));
     } else {
-      $proto = $this->getRemoteURIProtocol($v_remote);
-
-      if ($proto === 'file') {
-        if (!preg_match('@^file:///@', $v_remote)) {
-          $c_remote->setError(pht('Invalid'));
-          $page->addPageError(
-            pht(
-              "URIs using the 'file://' protocol should have three slashes ".
-              "(e.g., 'file:///absolute/path/to/file'). You only have two. ".
-              "Add another one."));
-        }
-      }
-
-      // Catch confusion between Git/SCP-style URIs and normal URIs. See T3619
-      // for discussion. This is usually a user adding "ssh://" to an implicit
-      // SSH Git URI.
-      if ($proto == 'ssh') {
-        if (preg_match('(^[^:@]+://[^/:]+:[^\d])', $v_remote)) {
-          $c_remote->setError(pht('Invalid'));
-          $page->addPageError(
-            pht(
-              "The Remote URI is not formatted correctly. Remote URIs ".
-              "with an explicit protocol should be in the form ".
-              "'proto://domain/path', not 'proto://domain:/path'. ".
-              "The ':/path' syntax is only valid in SCP-style URIs."));
-        }
-      }
-
-      switch ($proto) {
-        case 'ssh':
-        case 'http':
-        case 'https':
-        case 'file':
-        case 'git':
-        case 'svn':
-        case 'svn+ssh':
-          break;
-        default:
-          $c_remote->setError(pht('Invalid'));
-          $page->addPageError(
-            pht(
-              "The URI protocol is unrecognized. It should begin ".
-              "'ssh://', 'http://', 'https://', 'file://', 'git://', ".
-              "'svn://', 'svn+ssh://', or be in the form ".
-              "'git@domain.com:path'."));
-          break;
+      try {
+        PhabricatorRepository::assertValidRemoteURI($v_remote);
+      } catch (Exception $ex) {
+        $c_remote->setError(pht('Invalid'));
+        $page->addPageError($ex->getMessage());
       }
     }
 
@@ -573,7 +590,8 @@ final class DiffusionRepositoryCreateController
     $remote_uri = $form->getPage('remote-uri')
       ->getControl('remoteURI')
       ->getValue();
-    $proto = $this->getRemoteURIProtocol($remote_uri);
+
+    $proto = PhabricatorRepository::getRemoteURIProtocol($remote_uri);
     $remote_user = $this->getRemoteURIUser($remote_uri);
 
     $c_credential = $page->getControl('credential');
@@ -612,15 +630,6 @@ final class DiffusionRepositoryCreateController
           "If this repository does not require a username or password, ".
           "you can continue to the next step.",
           $remote_uri),
-        'credential');
-    } else if ($proto == 'file') {
-      $c_credential->setHidden(true);
-      $provides_type = null;
-
-      $page->addRemarkupInstructions(
-        pht(
-          'You do not need to configure any credentials for repositories '.
-          'accessed over the `file://` protocol. Continue to the next step.'),
         'credential');
     } else {
       throw new Exception('Unknown URI protocol!');
@@ -723,7 +732,7 @@ final class DiffusionRepositoryCreateController
 
     $push_policy = id(new AphrontFormPolicyControl())
       ->setUser($viewer)
-      ->setCapability(DiffusionCapabilityPush::CAPABILITY)
+      ->setCapability(DiffusionPushCapability::CAPABILITY)
       ->setPolicyObject($repository)
       ->setPolicies($policies)
       ->setName('pushPolicy');
@@ -870,21 +879,6 @@ final class DiffusionRepositoryCreateController
 
 /* -(  Internal  )----------------------------------------------------------- */
 
-
-  private function getRemoteURIProtocol($raw_uri) {
-    $uri = new PhutilURI($raw_uri);
-    if ($uri->getProtocol()) {
-      return strtolower($uri->getProtocol());
-    }
-
-    $git_uri = new PhutilGitURI($raw_uri);
-    if (strlen($git_uri->getDomain()) && strlen($git_uri->getPath())) {
-      return 'ssh';
-    }
-
-    return null;
-  }
-
   private function getRemoteURIUser($raw_uri) {
     $uri = new PhutilURI($raw_uri);
     if ($uri->getUser()) {
@@ -915,6 +909,5 @@ final class DiffusionRepositoryCreateController
   private function getRepository() {
     return $this->repository;
   }
-
 
 }

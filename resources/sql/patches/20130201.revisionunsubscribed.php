@@ -19,11 +19,10 @@ foreach ($revs as $rev) {
   }
 
   $editor = new PhabricatorEdgeEditor();
-  $editor->setSuppressEvents(true);
   foreach ($unsubscribed as $user_phid => $_) {
     $editor->addEdge(
       $rev['phid'],
-      PhabricatorEdgeConfig::TYPE_OBJECT_HAS_UNSUBSCRIBER,
+      PhabricatorObjectHasUnsubscriberEdgeType::EDGECONST ,
       $user_phid);
   }
   $editor->save();

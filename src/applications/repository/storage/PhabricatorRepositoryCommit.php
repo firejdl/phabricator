@@ -5,9 +5,13 @@ final class PhabricatorRepositoryCommit
   implements
     PhabricatorPolicyInterface,
     PhabricatorFlaggableInterface,
+    PhabricatorProjectInterface,
     PhabricatorTokenReceiverInterface,
+    PhabricatorSubscribableInterface,
+    PhabricatorMentionableInterface,
     HarbormasterBuildableInterface,
-    PhabricatorCustomFieldInterface {
+    PhabricatorCustomFieldInterface,
+    PhabricatorApplicationTransactionInterface {
 
   protected $repositoryID;
   protected $phid;
@@ -37,8 +41,11 @@ final class PhabricatorRepositoryCommit
     return $this;
   }
 
-  public function getRepository() {
-    return $this->assertAttached($this->repository);
+  public function getRepository($assert_attached = true) {
+    if ($assert_attached) {
+      return $this->assertAttached($this->repository);
+    }
+    return $this->repository;
   }
 
   public function isPartiallyImported($mask) {
@@ -56,6 +63,7 @@ final class PhabricatorRepositoryCommit
       $this->getTableName(),
       $flag,
       $this->getID());
+    $this->setImportStatus($this->getImportStatus() | $flag);
     return $this;
   }
 
@@ -63,12 +71,40 @@ final class PhabricatorRepositoryCommit
     return array(
       self::CONFIG_AUX_PHID   => true,
       self::CONFIG_TIMESTAMPS => false,
+      self::CONFIG_COLUMN_SCHEMA => array(
+        'commitIdentifier' => 'text40',
+        'mailKey' => 'bytes20',
+        'authorPHID' => 'phid?',
+        'auditStatus' => 'uint32',
+        'summary' => 'text80',
+        'importStatus' => 'uint32',
+      ),
+      self::CONFIG_KEY_SCHEMA => array(
+        'key_phid' => null,
+        'phid' => array(
+          'columns' => array('phid'),
+          'unique' => true,
+        ),
+        'repositoryID' => array(
+          'columns' => array('repositoryID', 'importStatus'),
+        ),
+        'authorPHID' => array(
+          'columns' => array('authorPHID', 'auditStatus', 'epoch'),
+        ),
+        'repositoryID_2' => array(
+          'columns' => array('repositoryID', 'epoch'),
+        ),
+        'key_commit_identity' => array(
+          'columns' => array('commitIdentifier', 'repositoryID'),
+          'unique' => true,
+        ),
+      ),
     ) + parent::getConfiguration();
   }
 
   public function generatePHID() {
     return PhabricatorPHID::generateNewPHID(
-      PhabricatorRepositoryPHIDTypeCommit::TYPECONST);
+      PhabricatorRepositoryCommitPHIDType::TYPECONST);
   }
 
   public function loadCommitData() {
@@ -282,6 +318,31 @@ final class PhabricatorRepositoryCommit
     return $this->getRepository()->getPHID();
   }
 
+  public function getBuildVariables() {
+    $results = array();
+
+    $results['buildable.commit'] = $this->getCommitIdentifier();
+    $repo = $this->getRepository();
+
+    $results['repository.callsign'] = $repo->getCallsign();
+    $results['repository.vcs'] = $repo->getVersionControlSystem();
+    $results['repository.uri'] = $repo->getPublicCloneURI();
+
+    return $results;
+  }
+
+  public function getAvailableBuildVariables() {
+    return array(
+      'buildable.commit' => pht('The commit identifier, if applicable.'),
+      'repository.callsign' =>
+        pht('The callsign of the repository in Phabricator.'),
+      'repository.vcs' =>
+        pht('The version control system, either "svn", "hg" or "git".'),
+      'repository.uri' =>
+        pht('The URI to clone or checkout the repository from.'),
+    );
+  }
+
 
 /* -(  PhabricatorCustomFieldInterface  )------------------------------------ */
 
@@ -303,6 +364,49 @@ final class PhabricatorRepositoryCommit
   public function attachCustomFields(PhabricatorCustomFieldAttachment $fields) {
     $this->customFields = $fields;
     return $this;
+  }
+
+
+/* -(  PhabricatorSubscribableInterface  )----------------------------------- */
+
+
+  public function isAutomaticallySubscribed($phid) {
+
+    // TODO: This should also list auditors, but handling that is a bit messy
+    // right now because we are not guaranteed to have the data.
+
+    return ($phid == $this->getAuthorPHID());
+  }
+
+  public function shouldShowSubscribersProperty() {
+    return true;
+  }
+
+  public function shouldAllowSubscription($phid) {
+    return true;
+  }
+
+
+/* -(  PhabricatorApplicationTransactionInterface  )------------------------- */
+
+
+  public function getApplicationTransactionEditor() {
+    return new PhabricatorAuditEditor();
+  }
+
+  public function getApplicationTransactionObject() {
+    return $this;
+  }
+
+  public function getApplicationTransactionTemplate() {
+    return new PhabricatorAuditTransaction();
+  }
+
+  public function willRenderTimeline(
+    PhabricatorApplicationTransactionView $timeline,
+    AphrontRequest $request) {
+
+    return $timeline;
   }
 
 }

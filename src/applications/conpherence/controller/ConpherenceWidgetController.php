@@ -1,10 +1,6 @@
 <?php
 
-/**
- * @group conpherence
- */
-final class ConpherenceWidgetController extends
-  ConpherenceController {
+final class ConpherenceWidgetController extends ConpherenceController {
 
   private $conpherenceID;
   private $conpherence;
@@ -14,6 +10,7 @@ final class ConpherenceWidgetController extends
     $this->userPreferences = $pref;
     return $this;
   }
+
   public function getUserPreferences() {
     return $this->userPreferences;
   }
@@ -22,6 +19,7 @@ final class ConpherenceWidgetController extends
     $this->conpherence = $conpherence;
     return $this;
   }
+
   public function getConpherence() {
     return $this->conpherence;
   }
@@ -30,6 +28,7 @@ final class ConpherenceWidgetController extends
     $this->conpherenceID = $conpherence_id;
     return $this;
   }
+
   public function getConpherenceID() {
     return $this->conpherenceID;
   }
@@ -61,7 +60,6 @@ final class ConpherenceWidgetController extends
   }
 
   private function renderWidgetPaneContent() {
-    require_celerity_resource('sprite-conpherence-css');
     $conpherence = $this->getConpherence();
 
     $widgets = array();
@@ -75,8 +73,8 @@ final class ConpherenceWidgetController extends
       array(
         'class' => 'widgets-header',
       ),
-      id(new PhabricatorActionHeaderView())
-      ->setHeaderColor(PhabricatorActionHeaderView::HEADER_GREY)
+      id(new PHUIActionHeaderView())
+      ->setHeaderColor(PHUIActionHeaderView::HEADER_GREY)
       ->setHeaderTitle(pht('Participants'))
       ->setHeaderHref('#')
       ->setDropdown(true)
@@ -101,7 +99,7 @@ final class ConpherenceWidgetController extends
         'class' => 'widgets-body',
         'id' => 'widgets-files',
         'sigil' => 'widgets-files',
-        'style' => 'display: none;'
+        'style' => 'display: none;',
       ),
       id(new ConpherenceFileWidgetView())
       ->setUser($user)
@@ -112,7 +110,7 @@ final class ConpherenceWidgetController extends
       array(
         'class' => 'widgets-body',
         'id' => 'widgets-calendar',
-        'style' => 'display: none;'
+        'style' => 'display: none;',
       ),
       $this->renderCalendarWidgetPaneContent());
     $widgets[] = phutil_tag(
@@ -120,7 +118,7 @@ final class ConpherenceWidgetController extends
       array(
         'class' => 'widgets-body',
         'id' => 'widgets-settings',
-        'style' => 'display: none'
+        'style' => 'display: none',
       ),
       $this->renderSettingsWidgetPaneContent());
 
@@ -167,7 +165,7 @@ final class ConpherenceWidgetController extends
         array(
           'type' => 'hidden',
           'name' => 'action',
-          'value' => 'notifications'
+          'value' => 'notifications',
         )),
       phutil_tag(
         'button',
@@ -175,7 +173,7 @@ final class ConpherenceWidgetController extends
           'type' => 'submit',
           'class' => 'notifications-update',
         ),
-        pht('Save'))
+        pht('Save')),
     );
 
     return phabricator_form(
@@ -223,21 +221,22 @@ final class ConpherenceWidgetController extends
         $content[] = phutil_tag(
           'div',
           array(
-            'class' => 'day-header '.$active_class
+            'class' => 'day-header '.$active_class,
           ),
           array(
             phutil_tag(
               'div',
               array(
-                'class' => 'day-name'
+                'class' => 'day-name',
               ),
               $day->format('l')),
             phutil_tag(
               'div',
               array(
-                'class' => 'day-date'
+                'class' => 'day-date',
               ),
-              $day->format('m/d/y'))));
+              $day->format('m/d/y')),
+          ));
       }
 
       $week_day_number = $day->format('w');
@@ -299,16 +298,18 @@ final class ConpherenceWidgetController extends
                 phutil_tag(
                   'div',
                   array(
-                    'class' => 'description'
+                    'class' => 'description',
                   ),
                   array(
                     $status->getTerseSummary($user),
                     phutil_tag(
                       'div',
                       array(
-                        'class' => 'participant'
+                        'class' => 'participant',
                       ),
-                      $secondary_info)))));
+                      $secondary_info),
+                  )),
+              ));
           }
           $first_status_of_the_day = false;
         }
@@ -333,14 +334,14 @@ final class ConpherenceWidgetController extends
             $inner_layout[] = phutil_tag(
               'div',
               array(
-                'class' => $status->getTextStatus()
+                'class' => $status->getTextStatus(),
               ),
               '');
           } else {
             $inner_layout[] = phutil_tag(
               'div',
               array(
-                'class' => 'present'
+                'class' => 'present',
               ),
               '');
           }
@@ -349,13 +350,13 @@ final class ConpherenceWidgetController extends
           phutil_tag(
             'div',
             array(
-              'class' => 'day-column'.$active_class
+              'class' => 'day-column'.$active_class,
             ),
             array(
               phutil_tag(
                 'div',
                 array(
-                  'class' => 'day-name'
+                  'class' => 'day-name',
                 ),
                 $day->format('D')),
               phutil_tag(
@@ -364,17 +365,16 @@ final class ConpherenceWidgetController extends
                   'class' => 'day-number',
                 ),
                 $day->format('j')),
-              $inner_layout
+              $inner_layout,
             )));
         $calendar_columns++;
       }
     }
 
-    return
-      array(
-        $layout,
-        $content
-      );
+    return array(
+      $layout,
+      $content,
+    );
   }
 
   private function getWidgetURI() {

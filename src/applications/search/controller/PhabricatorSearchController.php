@@ -39,6 +39,11 @@ final class PhabricatorSearchController
     // with only this piece of somewhat-sketchy code. See discussion in T4365.
 
     if ($request->getBool('search:primary')) {
+      if (!strlen($request->getStr('query'))) {
+        $advanced_uri = '/search/query/advanced/';
+        return id(new AphrontRedirectResponse())->setURI($advanced_uri);
+      }
+
       $named_queries = $engine->loadEnabledNamedQueries();
       if ($named_queries) {
         $named = head($named_queries);
@@ -59,7 +64,7 @@ final class PhabricatorSearchController
           $unguarded = AphrontWriteGuard::beginScopedUnguardedWrites();
             try {
               $saved->setID(null)->save();
-            } catch (AphrontQueryDuplicateKeyException $ex) {
+            } catch (AphrontDuplicateKeyQueryException $ex) {
               // Ignore, this is just a repeated search.
             }
           unset($unguarded);
@@ -72,7 +77,7 @@ final class PhabricatorSearchController
       }
     }
 
-    $controller = id(new PhabricatorApplicationSearchController($request))
+    $controller = id(new PhabricatorApplicationSearchController())
       ->setQueryKey($this->queryKey)
       ->setSearchEngine($engine)
       ->setNavigation($this->buildSideNavView());

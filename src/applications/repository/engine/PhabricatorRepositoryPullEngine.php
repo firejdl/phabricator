@@ -52,6 +52,7 @@ final class PhabricatorRepositoryPullEngine
         break;
       default:
         $this->abortPull(pht('Unknown VCS "%s"!', $vcs));
+        break;
     }
 
     $callsign = $repository->getCallsign();
@@ -88,6 +89,7 @@ final class PhabricatorRepositoryPullEngine
               "Updating the working copy for repository '%s'.",
               $callsign));
           if ($is_git) {
+            $this->verifyGitOrigin($repository);
             $this->executeGitUpdate();
           } else if ($is_hg) {
             $this->executeMercurialUpdate();
@@ -151,7 +153,7 @@ final class PhabricatorRepositoryPullEngine
       PhabricatorRepositoryStatusMessage::TYPE_INIT,
       $code,
       array(
-        'message' => $message
+        'message' => $message,
       ));
   }
 
@@ -171,7 +173,7 @@ final class PhabricatorRepositoryPullEngine
       $bin,
       $callsign);
 
-    $hook = "#!/bin/sh\n{$cmd}\n";
+    $hook = "#!/bin/sh\nexport TERM=dumb\n{$cmd}\n";
 
     Filesystem::writeFile($path, $hook);
     Filesystem::changePermissions($path, 0755);

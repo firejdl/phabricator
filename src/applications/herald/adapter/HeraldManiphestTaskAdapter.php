@@ -13,12 +13,11 @@ final class HeraldManiphestTaskAdapter extends HeraldAdapter {
   }
 
   public function getAdapterApplicationClass() {
-    return 'PhabricatorApplicationManiphest';
+    return 'PhabricatorManiphestApplication';
   }
 
   public function getAdapterContentDescription() {
-    return pht(
-      'React to tasks being created or updated.');
+    return pht('React to tasks being created or updated.');
   }
 
   public function getRepetitionOptions() {
@@ -90,6 +89,7 @@ final class HeraldManiphestTaskAdapter extends HeraldAdapter {
         self::FIELD_CONTENT_SOURCE,
         self::FIELD_PROJECTS,
         self::FIELD_TASK_PRIORITY,
+        self::FIELD_TASK_STATUS,
         self::FIELD_IS_NEW_OBJECT,
       ),
       parent::getFields());
@@ -98,21 +98,25 @@ final class HeraldManiphestTaskAdapter extends HeraldAdapter {
   public function getActions($rule_type) {
     switch ($rule_type) {
       case HeraldRuleTypeConfig::RULE_TYPE_GLOBAL:
-        return array(
-          self::ACTION_ADD_CC,
-          self::ACTION_EMAIL,
-          self::ACTION_ASSIGN_TASK,
-          self::ACTION_ADD_PROJECTS,
-          self::ACTION_NOTHING,
-        );
+        return array_merge(
+          array(
+            self::ACTION_ADD_CC,
+            self::ACTION_EMAIL,
+            self::ACTION_ASSIGN_TASK,
+            self::ACTION_ADD_PROJECTS,
+            self::ACTION_NOTHING,
+          ),
+          parent::getActions($rule_type));
       case HeraldRuleTypeConfig::RULE_TYPE_PERSONAL:
-        return array(
-          self::ACTION_ADD_CC,
-          self::ACTION_EMAIL,
-          self::ACTION_FLAG,
-          self::ACTION_ASSIGN_TASK,
-          self::ACTION_NOTHING,
-        );
+        return array_merge(
+          array(
+            self::ACTION_ADD_CC,
+            self::ACTION_EMAIL,
+            self::ACTION_FLAG,
+            self::ACTION_ASSIGN_TASK,
+            self::ACTION_NOTHING,
+          ),
+          parent::getActions($rule_type));
     }
   }
 
@@ -135,11 +139,16 @@ final class HeraldManiphestTaskAdapter extends HeraldAdapter {
       case self::FIELD_ASSIGNEE:
         return $this->getTask()->getOwnerPHID();
       case self::FIELD_CC:
-        return $this->getTask()->getCCPHIDs();
+        return PhabricatorSubscribersQuery::loadSubscribersForPHID(
+          $this->getTask()->getPHID());
       case self::FIELD_PROJECTS:
-        return $this->getTask()->getProjectPHIDs();
+        return PhabricatorEdgeQuery::loadDestinationPHIDs(
+          $this->getTask()->getPHID(),
+          PhabricatorProjectObjectHasProjectEdgeType::EDGECONST);
       case self::FIELD_TASK_PRIORITY:
         return $this->getTask()->getPriority();
+      case self::FIELD_TASK_STATUS:
+        return $this->getTask()->getStatus();
     }
 
     return parent::getHeraldField($field);
@@ -200,7 +209,15 @@ final class HeraldManiphestTaskAdapter extends HeraldAdapter {
             pht('Added projects.'));
           break;
         default:
-          throw new Exception("No rules to handle action '{$action}'.");
+          $custom_result = parent::handleCustomHeraldEffect($effect);
+          if ($custom_result === null) {
+            throw new Exception(pht(
+              "No rules to handle action '%s'.",
+              $action));
+          }
+
+          $result[] = $custom_result;
+          break;
       }
     }
     return $result;

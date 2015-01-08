@@ -33,13 +33,22 @@ abstract class PhabricatorHomeController extends PhabricatorController {
       $user);
 
     // Force "Applications" to appear at the bottom.
-    $meta_app = 'PhabricatorApplicationApplications';
+    $meta_app = 'PhabricatorApplicationsApplication';
     $pinned = array_fuse($pinned);
     unset($pinned[$meta_app]);
     $pinned[$meta_app] = $meta_app;
     $applications[$meta_app] = PhabricatorApplication::getByClass($meta_app);
 
     $tiles = array();
+
+    $home_app = new PhabricatorHomeApplication();
+
+    $tiles[] = id(new PhabricatorApplicationLaunchView())
+      ->setApplication($home_app)
+      ->setApplicationStatus($home_app->loadStatus($user))
+      ->addClass('phabricator-application-launch-phone-only')
+      ->setUser($user);
+
     foreach ($pinned as $pinned_application) {
       if (empty($applications[$pinned_application])) {
         continue;

@@ -5,6 +5,10 @@ final class PhabricatorDashboardViewController
 
   private $id;
 
+  public function shouldAllowPublic() {
+    return true;
+  }
+
   public function willProcessRequest(array $data) {
     $this->id = $data['id'];
   }
@@ -42,11 +46,10 @@ final class PhabricatorDashboardViewController
       ),
       array(
         'title' => $title,
-        'device' => true,
       ));
   }
 
-  public function buildApplicationCrumbs() {
+  protected function buildApplicationCrumbs() {
     $crumbs = parent::buildApplicationCrumbs();
     $id = $this->id;
 

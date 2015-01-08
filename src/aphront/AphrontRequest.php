@@ -25,10 +25,24 @@ final class AphrontRequest {
   private $requestData;
   private $user;
   private $applicationConfiguration;
+  private $uriData;
 
   final public function __construct($host, $path) {
     $this->host = $host;
     $this->path = $path;
+  }
+
+  final public function setURIMap(array $uri_data) {
+    $this->uriData = $uri_data;
+    return $this;
+  }
+
+  final public function getURIMap() {
+    return $this->uriData;
+  }
+
+  final public function getURIData($key, $default = null) {
+    return idx($this->uriData, $key, $default);
   }
 
   final public function setApplicationConfiguration(
@@ -274,6 +288,18 @@ final class AphrontRequest {
     return $this->validateCSRF();
   }
 
+  final public function isFormOrHisecPost() {
+    $post = $this->getExists(self::TYPE_FORM) &&
+            $this->isHTTPPost();
+
+    if (!$post) {
+      return false;
+    }
+
+    return $this->validateCSRF();
+  }
+
+
   final public function setCookiePrefix($prefix) {
     $this->cookiePrefix = $prefix;
     return $this;
@@ -461,6 +487,10 @@ final class AphrontRequest {
   }
 
   final public function getUser() {
+    return $this->user;
+  }
+
+  final public function getViewer() {
     return $this->user;
   }
 

@@ -1,7 +1,6 @@
 <?php
 
-abstract class PhabricatorMacroController
-  extends PhabricatorController {
+abstract class PhabricatorMacroController extends PhabricatorController {
 
   protected function buildSideNavView($for_app = false) {
     $nav = new AphrontSideNavFilterView();
@@ -21,7 +20,7 @@ abstract class PhabricatorMacroController
     return $nav;
   }
 
-  public function buildApplicationMenu() {
+  protected function buildApplicationMenu() {
     return $this->buildSideNavView($for_app = true)->getMenu();
   }
 
@@ -29,7 +28,7 @@ abstract class PhabricatorMacroController
     $crumbs = parent::buildApplicationCrumbs();
 
     $can_manage = $this->hasApplicationCapability(
-      PhabricatorMacroCapabilityManage::CAPABILITY);
+      PhabricatorMacroManageCapability::CAPABILITY);
 
     $crumbs->addAction(
       id(new PHUIListItemView())

@@ -30,7 +30,7 @@ final class PhabricatorAsanaConfigOptions
             'object in Phabricator comes from. For example, you can add code '.
             'reviews in Asana to a "Differential" project.'.
             "\n\n".
-            'NOTE: This feature is new and experimental.'))
+            'NOTE: This feature is new and experimental.')),
     );
   }
 
@@ -49,7 +49,7 @@ final class PhabricatorAsanaConfigOptions
 
     $viewer = $request->getUser();
 
-    $provider = PhabricatorAuthProviderOAuthAsana::getAsanaProvider();
+    $provider = PhabricatorAsanaAuthProvider::getAsanaProvider();
     if (!$provider) {
       return null;
     }
@@ -59,6 +59,11 @@ final class PhabricatorAsanaConfigOptions
       ->withUserPHIDs(array($viewer->getPHID()))
       ->withAccountTypes(array($provider->getProviderType()))
       ->withAccountDomains(array($provider->getProviderDomain()))
+      ->requireCapabilities(
+        array(
+          PhabricatorPolicyCapability::CAN_VIEW,
+          PhabricatorPolicyCapability::CAN_EDIT,
+        ))
       ->executeOne();
     if (!$account) {
       return null;

@@ -42,7 +42,7 @@ final class PhabricatorProjectMembersEditController
         $member_spec['+'] = array_fuse($add_members);
       }
 
-      $type_member = PhabricatorEdgeConfig::TYPE_PROJ_MEMBER;
+      $type_member = PhabricatorProjectProjectHasMemberEdgeType::EDGECONST;
 
       $xactions = array();
 
@@ -83,7 +83,7 @@ final class PhabricatorProjectMembersEditController
         id(new AphrontFormTokenizerControl())
           ->setName('phids')
           ->setLabel(pht('Add Members'))
-          ->setDatasource('/typeahead/common/accounts/'))
+          ->setDatasource(new PhabricatorPeopleDatasource()))
       ->appendChild(
         id(new AphrontFormSubmitControl())
           ->addCancelButton('/project/view/'.$project->getID().'/')
@@ -109,7 +109,6 @@ final class PhabricatorProjectMembersEditController
       ),
       array(
         'title' => $title,
-        'device' => true,
       ));
   }
 

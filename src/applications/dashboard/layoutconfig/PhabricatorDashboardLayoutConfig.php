@@ -32,6 +32,18 @@ final class PhabricatorDashboardLayoutConfig {
     return $this->panelLocations;
   }
 
+  public function replacePanel($old_phid, $new_phid) {
+    $locations = $this->getPanelLocations();
+    foreach ($locations as $column => $panel_phids) {
+      foreach ($panel_phids as $key => $panel_phid) {
+        if ($panel_phid == $old_phid) {
+          $locations[$column][$key] = $new_phid;
+        }
+      }
+    }
+    return $this->setPanelLocations($locations);
+  }
+
   public function removePanel($panel_phid) {
     $panel_location_grid = $this->getPanelLocations();
     foreach ($panel_location_grid as $column => $panel_columns) {
@@ -108,7 +120,8 @@ final class PhabricatorDashboardLayoutConfig {
       case self::MODE_THIRDS_AND_THIRD:
         return array(
           0 => pht('Left'),
-          1 => pht('Right'));
+          1 => pht('Right'),
+        );
         break;
       case self::MODE_FULL:
         throw new Exception('There is only one column in mode full.');
@@ -144,7 +157,7 @@ final class PhabricatorDashboardLayoutConfig {
   public function toDictionary() {
     return array(
       'layoutMode' => $this->getLayoutMode(),
-      'panelLocations' => $this->getPanelLocations()
+      'panelLocations' => $this->getPanelLocations(),
     );
   }
 

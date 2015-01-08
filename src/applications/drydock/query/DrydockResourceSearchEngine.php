@@ -3,8 +3,12 @@
 final class DrydockResourceSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationDrydock';
+  public function getResultTypeDescription() {
+    return pht('Drydock Resources');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorDrydockApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -46,20 +50,17 @@ final class DrydockResourceSearchEngine
 
     $form
       ->appendChild($status_control);
-
   }
 
   protected function getURI($path) {
     return '/drydock/resource/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array(
+  protected function getBuiltinQueryNames() {
+    return array(
       'active' => pht('Active Resources'),
       'all' => pht('All Resources'),
     );
-
-    return $names;
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {

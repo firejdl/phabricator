@@ -187,6 +187,9 @@ final class DiffusionCommitHookEngine extends Phobject {
           'eventPHID' => $event->getPHID(),
           'emailPHIDs' => array_values($this->emailPHIDs),
           'info' => $this->loadCommitInfoForWorker($all_updates),
+        ),
+        array(
+          'priority' => PhabricatorWorker::PRIORITY_ALERTS,
         ));
     }
 
@@ -442,7 +445,9 @@ final class DiffusionCommitHookEngine extends Phobject {
         $ref_new);
     }
 
-    foreach (Futures($futures)->limit(8) as $key => $future) {
+    $futures = id(new FutureIterator($futures))
+      ->limit(8);
+    foreach ($futures as $key => $future) {
 
       // If 'old' and 'new' have no common ancestors (for example, a force push
       // which completely rewrites a ref), `git merge-base` will exit with
@@ -477,7 +482,12 @@ final class DiffusionCommitHookEngine extends Phobject {
       $ref_flags = 0;
       $dangerous = null;
 
-      if ($ref_old === self::EMPTY_HASH) {
+      if (($ref_old === self::EMPTY_HASH) && ($ref_new === self::EMPTY_HASH)) {
+        // This happens if you try to delete a tag or branch which does not
+        // exist by pushing directly to the ref. Git will warn about it but
+        // allow it. Just call it a delete, without flagging it as dangerous.
+        $ref_flags |= PhabricatorRepositoryPushLog::CHANGEFLAG_DELETE;
+      } else if ($ref_old === self::EMPTY_HASH) {
         $ref_flags |= PhabricatorRepositoryPushLog::CHANGEFLAG_ADD;
       } else if ($ref_new === self::EMPTY_HASH) {
         $ref_flags |= PhabricatorRepositoryPushLog::CHANGEFLAG_DELETE;
@@ -546,7 +556,9 @@ final class DiffusionCommitHookEngine extends Phobject {
     }
 
     $content_updates = array();
-    foreach (Futures($futures)->limit(8) as $key => $future) {
+    $futures = id(new FutureIterator($futures))
+      ->limit(8);
+    foreach ($futures as $key => $future) {
       list($stdout) = $future->resolvex();
 
       if (!strlen(trim($stdout))) {
@@ -688,7 +700,7 @@ final class DiffusionCommitHookEngine extends Phobject {
     foreach (array('old', 'new') as $key) {
       $futures[$key] = $repository->getLocalCommandFuture(
         'heads --template %s',
-        '{node}\1{branches}\2');
+        '{node}\1{branch}\2');
     }
     // Wipe HG_PENDING out of the old environment so we see the pre-commit
     // state of the repository.
@@ -697,11 +709,11 @@ final class DiffusionCommitHookEngine extends Phobject {
     $futures['commits'] = $repository->getLocalCommandFuture(
       'log --rev %s --template %s',
       hgsprintf('%s:%s', $hg_node, 'tip'),
-      '{node}\1{branches}\2');
+      '{node}\1{branch}\2');
 
     // Resolve all of the futures now. We don't need the 'commits' future yet,
     // but it simplifies the logic to just get it out of the way.
-    foreach (Futures($futures) as $future) {
+    foreach (new FutureIterator($futures) as $future) {
       $future->resolve();
     }
 
@@ -774,7 +786,7 @@ final class DiffusionCommitHookEngine extends Phobject {
         }
 
         $head_map = array();
-        foreach (Futures($dfutures) as $future_head => $dfuture) {
+        foreach (new FutureIterator($dfutures) as $future_head => $dfuture) {
           list($stdout) = $dfuture->resolvex();
           $descendant_heads = array_filter(explode("\1", $stdout));
           if ($descendant_heads) {
@@ -978,15 +990,8 @@ final class DiffusionCommitHookEngine extends Phobject {
     $commits_lines = array_filter($commits_lines);
     $commit_map = array();
     foreach ($commits_lines as $commit_line) {
-      list($node, $branches_raw) = explode("\1", $commit_line);
-
-      if (!strlen($branches_raw)) {
-        $branches = array('default');
-      } else {
-        $branches = explode(' ', $branches_raw);
-      }
-
-      $commit_map[$node] = $branches;
+      list($node, $branch) = explode("\1", $commit_line);
+      $commit_map[$node] = array($branch);
     }
 
     return $commit_map;
@@ -1116,7 +1121,8 @@ final class DiffusionCommitHookEngine extends Phobject {
 
     $parser = new ArcanistDiffParser();
     $changes = $parser->parseDiff($raw_diff);
-    $diff = DifferentialDiff::newFromRawChanges($changes);
+    $diff = DifferentialDiff::newEphemeralFromRawChanges(
+      $changes);
     return $diff->getChangesets();
   }
 
@@ -1152,6 +1158,9 @@ final class DiffusionCommitHookEngine extends Phobject {
       case PhabricatorRepositoryType::REPOSITORY_TYPE_GIT:
         return idx($this->gitCommits, $identifier, array());
       case PhabricatorRepositoryType::REPOSITORY_TYPE_MERCURIAL:
+        // NOTE: This will be "the branch the commit was made to", not
+        // "a list of all branch heads which descend from the commit".
+        // This is consistent with Mercurial, but possibly confusing.
         return idx($this->mercurialCommits, $identifier, array());
       case PhabricatorRepositoryType::REPOSITORY_TYPE_SVN:
         // Subversion doesn't have branches.

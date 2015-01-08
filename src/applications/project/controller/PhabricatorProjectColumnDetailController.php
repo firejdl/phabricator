@@ -41,20 +41,12 @@ final class PhabricatorProjectColumnDetailController
       return new Aphront404Response();
     }
 
-    $xactions = id(new PhabricatorProjectColumnTransactionQuery())
-      ->setViewer($viewer)
-      ->withObjectPHIDs(array($column->getPHID()))
-      ->execute();
+    $timeline = $this->buildTransactionTimeline(
+      $column,
+      new PhabricatorProjectColumnTransactionQuery());
+    $timeline->setShouldTerminate(true);
 
-    $engine = id(new PhabricatorMarkupEngine())
-      ->setViewer($viewer);
-
-    $timeline = id(new PhabricatorApplicationTransactionView())
-      ->setUser($viewer)
-      ->setObjectPHID($column->getPHID())
-      ->setTransactions($xactions);
-
-    $title = pht('%s', $column->getName());
+    $title = pht('%s', $column->getDisplayName());
     $crumbs = $this->buildApplicationCrumbs();
     $crumbs->addTextCrumb(
       pht('Board'),
@@ -77,7 +69,6 @@ final class PhabricatorProjectColumnDetailController
       ),
       array(
         'title' => $title,
-        'device' => true,
       ));
   }
 
@@ -86,11 +77,11 @@ final class PhabricatorProjectColumnDetailController
 
     $header = id(new PHUIHeaderView())
       ->setUser($viewer)
-      ->setHeader($column->getName())
+      ->setHeader($column->getDisplayName())
       ->setPolicyObject($column);
 
-    if ($column->isDeleted()) {
-      $header->setStatus('fa-ban', 'dark', pht('Deleted'));
+    if ($column->isHidden()) {
+      $header->setStatus('fa-ban', 'dark', pht('Hidden'));
     }
 
     return $header;
@@ -114,29 +105,11 @@ final class PhabricatorProjectColumnDetailController
 
     $actions->addAction(
       id(new PhabricatorActionView())
-        ->setName(pht('Edit column'))
+        ->setName(pht('Edit Column'))
         ->setIcon('fa-pencil')
         ->setHref($this->getApplicationURI($base_uri.'edit/'.$id.'/'))
         ->setDisabled(!$can_edit)
         ->setWorkflow(!$can_edit));
-
-    if (!$column->isDeleted()) {
-      $actions->addAction(
-        id(new PhabricatorActionView())
-          ->setName(pht('Delete column'))
-          ->setIcon('fa-times')
-          ->setHref($this->getApplicationURI($base_uri.'delete/'.$id.'/'))
-          ->setDisabled(!$can_edit)
-          ->setWorkflow(true));
-    } else {
-      $actions->addAction(
-        id(new PhabricatorActionView())
-          ->setName(pht('Activate column'))
-          ->setIcon('fa-play-circle-o')
-          ->setHref($this->getApplicationURI($base_uri.'delete/'.$id.'/'))
-          ->setDisabled(!$can_edit)
-          ->setWorkflow(true));
-    }
 
     return $actions;
   }
@@ -158,6 +131,12 @@ final class PhabricatorProjectColumnDetailController
     $properties->addProperty(
       pht('Editable By'),
       $descriptions[PhabricatorPolicyCapability::CAN_EDIT]);
+
+
+    $limit = $column->getPointLimit();
+    $properties->addProperty(
+      pht('Point Limit'),
+      $limit ? $limit : pht('No Limit'));
 
     return $properties;
   }

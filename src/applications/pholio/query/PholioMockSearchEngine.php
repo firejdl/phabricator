@@ -1,10 +1,13 @@
 <?php
 
-final class PholioMockSearchEngine
-  extends PhabricatorApplicationSearchEngine {
+final class PholioMockSearchEngine extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationPholio';
+  public function getResultTypeDescription() {
+    return pht('Pholio Mocks');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorPholioApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -43,7 +46,8 @@ final class PholioMockSearchEngine
     $statuses = array(
       '' => pht('Any Status'),
       'closed' => pht('Closed'),
-      'open' => pht('Open'));
+      'open' => pht('Open'),
+    );
 
     $status = $saved_query->getParameter('statuses', array());
     $status = head($status);
@@ -51,7 +55,7 @@ final class PholioMockSearchEngine
     $form
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/users/')
+          ->setDatasource(new PhabricatorPeopleDatasource())
           ->setName('authors')
           ->setLabel(pht('Authors'))
           ->setValue($author_handles))
@@ -67,7 +71,7 @@ final class PholioMockSearchEngine
     return '/pholio/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
+  protected function getBuiltinQueryNames() {
     $names = array(
       'open' => pht('Open Mocks'),
       'all' => pht('All Mocks'),
@@ -81,7 +85,6 @@ final class PholioMockSearchEngine
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 
@@ -119,15 +122,12 @@ final class PholioMockSearchEngine
     foreach ($mocks as $mock) {
 
       $header = 'M'.$mock->getID().' '.$mock->getName();
-      if ($mock->isClosed()) {
-        $header = pht('%s (Closed)', $header);
-      }
-
       $item = id(new PHUIPinboardItemView())
         ->setHeader($header)
         ->setURI('/M'.$mock->getID())
         ->setImageURI($mock->getCoverFile()->getThumb280x210URI())
         ->setImageSize(280, 210)
+        ->setDisabled($mock->isClosed())
         ->addIconCount('fa-picture-o', count($mock->getImages()))
         ->addIconCount('fa-trophy', $mock->getTokenCount());
 

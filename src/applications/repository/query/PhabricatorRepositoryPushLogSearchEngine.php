@@ -3,8 +3,12 @@
 final class PhabricatorRepositoryPushLogSearchEngine
   extends PhabricatorApplicationSearchEngine {
 
-  public function getApplicationClassName() {
-    return 'PhabricatorApplicationDiffusion';
+  public function getResultTypeDescription() {
+    return pht('Push Logs');
+  }
+
+  protected function getApplicationClassName() {
+    return 'PhabricatorDiffusionApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -16,7 +20,7 @@ final class PhabricatorRepositoryPushLogSearchEngine
         $request,
         'repositories',
         array(
-          PhabricatorRepositoryPHIDTypeRepository::TYPECONST,
+          PhabricatorRepositoryRepositoryPHIDType::TYPECONST,
         )));
 
     $saved->setParameter(
@@ -70,13 +74,13 @@ final class PhabricatorRepositoryPushLogSearchEngine
     $form
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/repositories/')
+          ->setDatasource(new DiffusionRepositoryDatasource())
           ->setName('repositories')
           ->setLabel(pht('Repositories'))
           ->setValue($repository_handles))
       ->appendChild(
         id(new AphrontFormTokenizerControl())
-          ->setDatasource('/typeahead/common/accounts/')
+          ->setDatasource(new PhabricatorPeopleDatasource())
           ->setName('pushers')
           ->setLabel(pht('Pushers'))
           ->setValue($pusher_handles));
@@ -86,16 +90,13 @@ final class PhabricatorRepositoryPushLogSearchEngine
     return '/diffusion/pushlog/'.$path;
   }
 
-  public function getBuiltinQueryNames() {
-    $names = array(
+  protected function getBuiltinQueryNames() {
+    return array(
       'all' => pht('All Push Logs'),
     );
-
-    return $names;
   }
 
   public function buildSavedQueryFromBuiltin($query_key) {
-
     $query = $this->newSavedQuery();
     $query->setQueryKey($query_key);
 

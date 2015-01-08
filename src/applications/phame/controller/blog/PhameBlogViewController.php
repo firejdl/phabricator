@@ -1,8 +1,5 @@
 <?php
 
-/**
- * @group phame
- */
 final class PhameBlogViewController extends PhameController {
 
   private $id;
@@ -74,7 +71,6 @@ final class PhameBlogViewController extends PhameController {
     return $this->buildApplicationPage(
       $nav,
       array(
-        'device' => true,
         'title' => $blog->getName(),
       ));
   }
@@ -109,7 +105,7 @@ final class PhameBlogViewController extends PhameController {
           'meta' => array(
             'tip' => pht('Atom URI does not support custom domains.'),
             'size' => 320,
-          )
+          ),
         ),
         $feed_uri));
 
@@ -142,7 +138,6 @@ final class PhameBlogViewController extends PhameController {
   }
 
   private function renderActions(PhameBlog $blog, PhabricatorUser $user) {
-
     $actions = id(new PhabricatorActionListView())
       ->setObject($blog)
       ->setObjectURI($this->getRequest()->getRequestURI())

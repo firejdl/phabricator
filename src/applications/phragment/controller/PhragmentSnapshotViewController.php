@@ -76,10 +76,11 @@ final class PhragmentSnapshotViewController extends PhragmentController {
         $crumbs,
         $this->renderConfigurationWarningIfRequired(),
         $box,
-        $list),
+        $list,
+      ),
       array(
         'title' => pht('View Snapshot'),
-        'device' => true));
+      ));
   }
 
   protected function createSnapshotView($snapshot) {
