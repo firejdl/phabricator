@@ -326,11 +326,12 @@ final class PhrictionDocumentController
 
     $d_child = PhabricatorSlug::getDepth($slug) + 1;
     $d_grandchild = PhabricatorSlug::getDepth($slug) + 2;
+    $d = range(PhabricatorSlug::getDepth($slug) + 1, PhabricatorSlug::getDepth($slug) + 10);
     $limit = 250;
 
     $query = id(new PhrictionDocumentQuery())
       ->setViewer($this->getRequest()->getUser())
-      ->withDepths(array($d_child, $d_grandchild))
+      ->withDepths($d)
       ->withSlugPrefix($slug == '/' ? '' : $slug)
       ->withStatuses(array(
         PhrictionDocumentStatus::STATUS_EXISTS,
@@ -390,37 +391,9 @@ final class PhrictionDocumentController
       }
     }
 
-    // Fill in any missing children.
-    $known_slugs = mpull($children, null, 'getSlug');
-    foreach ($grandchildren_dicts as $slug => $ignored) {
-      if (empty($known_slugs[$slug])) {
-        $children_dicts[] = array(
-          'slug'    => $slug,
-          'depth'   => $d_child,
-          'title'   => PhabricatorSlug::getDefaultTitle($slug),
-          'empty'   => true,
-        );
-      }
-    }
-
     $children_dicts = isort($children_dicts, 'title');
 
-    $list = array();
-    foreach ($children_dicts as $child) {
-      $list[] = hsprintf('<li>');
-      $list[] = $this->renderChildDocumentLink($child);
-      $grand = idx($grandchildren_dicts, $child['slug'], array());
-      if ($grand) {
-        $list[] = hsprintf('<ul>');
-        foreach ($grand as $grandchild) {
-          $list[] = hsprintf('<li>');
-          $list[] = $this->renderChildDocumentLink($grandchild);
-          $list[] = hsprintf('</li>');
-        }
-        $list[] = hsprintf('</ul>');
-      }
-      $list[] = hsprintf('</li>');
-    }
+    $list = $this->renderDescendents($children_dicts, $grandchildren_dicts, $d_child);
     if ($more_children) {
       $list[] = phutil_tag('li', array(), pht('More...'));
     }
@@ -444,6 +417,29 @@ final class PhrictionDocumentController
     return id(new PHUIDocumentView())
       ->setOffset(true)
       ->appendChild($content);
+  }
+
+  private function renderDescendents(
+    $children,
+    $grandchildren,
+    $current_depth) {
+    $list = array();
+    foreach ($children as $child) {
+      if ($child['depth'] != $current_depth) {
+        continue;
+      }
+      $list[] = hsprintf('<li>');
+      $list[] = $this->renderChildDocumentLink($child);
+      $grand = idx($grandchildren, $child['slug'], array());
+      if ($grand) {
+        $list[] = hsprintf('<ul>');
+        $list = array_merge($list,
+          $this->renderDescendents($grand, $grandchildren, $current_depth + 1));
+        $list[] = hsprintf('</ul>');
+      }
+      $list[] = hsprintf('</li>');
+    }
+    return $list;
   }
 
   private function renderChildDocumentLink(array $info) {
