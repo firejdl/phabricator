@@ -33,7 +33,7 @@ JX.behavior('conpherence-pontificate', function() {
     infonode.value = id;
   }
 
-  JX.Stratcom.listen('aphlict-receive-message', null, function(e) {
+  JX.Stratcom.listen('aphlict-server-message', null, function(e) {
     var message = e.getData();
 
     if (message.type != 'message') {
@@ -142,13 +142,9 @@ JX.behavior('conpherence-pontificate', function() {
         var textarea = JX.DOM.find(form, 'textarea');
         textarea.value = '';
 
-        JX.Stratcom.invoke(
-          'conpherence-selectthread',
-          null,
-          { id : r.conpherence_phid + '-nav-item' }
-          );
-
         JX.DOM.alterClass(form_root, 'loading', false);
+
+        setTimeout(function() { JX.DOM.focus(textarea); }, 100);
       }));
 
     sync_workflow(workflow, get_thread_data());

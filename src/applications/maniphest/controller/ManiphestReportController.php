@@ -52,6 +52,7 @@ final class ManiphestReportController extends ManiphestController {
     $nav->appendChild($core);
     $nav->setCrumbs(
       $this->buildApplicationCrumbs()
+        ->setBorder(true)
         ->addTextCrumb(pht('Reports')));
 
     return $this->buildApplicationPage(
@@ -261,9 +262,9 @@ final class ManiphestReportController extends ManiphestController {
     }
 
     if ($caption) {
-      $caption = id(new AphrontErrorView())
+      $caption = id(new PHUIInfoView())
         ->appendChild($caption)
-        ->setSeverity(AphrontErrorView::SEVERITY_NOTICE);
+        ->setSeverity(PHUIInfoView::SEVERITY_NOTICE);
     }
 
     $panel = new PHUIObjectBoxView();

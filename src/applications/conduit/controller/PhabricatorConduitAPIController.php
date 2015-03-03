@@ -34,11 +34,14 @@ final class PhabricatorConduitAPIController
 
       $result = null;
 
-      // TODO: Straighten out the auth pathway here. We shouldn't be creating
-      // a ConduitAPIRequest at this level, but some of the auth code expects
-      // it. Landing a halfway version of this to unblock T945.
+      // TODO: The relationship between ConduitAPIRequest and ConduitCall is a
+      // little odd here and could probably be improved. Specifically, the
+      // APIRequest is a sub-object of the Call, which does not parallel the
+      // role of AphrontRequest (which is an indepenent object).
+      // In particular, the setUser() and getUser() existing independently on
+      // the Call and APIRequest is very awkward.
 
-      $api_request = new ConduitAPIRequest($params);
+      $api_request = $call->getAPIRequest();
 
       $allow_unguarded_writes = false;
       $auth_error = null;
@@ -284,6 +287,9 @@ final class PhabricatorConduitAPIController
         }
 
         $user = PhabricatorUser::getOmnipotentUser();
+
+        // Flag this as an intracluster request.
+        $api_request->setIsClusterRequest(true);
       }
 
       return $this->validateAuthenticatedUser(
@@ -380,6 +386,9 @@ final class PhabricatorConduitAPIController
               'cluster address range. Requests signed with cluster API '.
               'tokens must originate from within the cluster.'),);
         }
+
+        // Flag this as an intracluster request.
+        $api_request->setIsClusterRequest(true);
       }
 
       $user = $token->getObject();
@@ -523,7 +532,6 @@ final class PhabricatorConduitAPIController
     }
 
     $param_table = new AphrontTableView($param_rows);
-    $param_table->setDeviceReadyTable(true);
     $param_table->setColumnClasses(
       array(
         'header',
@@ -539,26 +547,19 @@ final class PhabricatorConduitAPIController
     }
 
     $result_table = new AphrontTableView($result_rows);
-    $result_table->setDeviceReadyTable(true);
     $result_table->setColumnClasses(
       array(
         'header',
         'wide',
       ));
 
-    $param_panel = new AphrontPanelView();
-    $param_panel->setHeader('Method Parameters');
+    $param_panel = new PHUIObjectBoxView();
+    $param_panel->setHeaderText(pht('Method Parameters'));
     $param_panel->appendChild($param_table);
 
-    $result_panel = new AphrontPanelView();
-    $result_panel->setHeader('Method Result');
+    $result_panel = new PHUIObjectBoxView();
+    $result_panel->setHeaderText(pht('Method Result'));
     $result_panel->appendChild($result_table);
-
-    $param_head = id(new PHUIHeaderView())
-      ->setHeader(pht('Method Parameters'));
-
-    $result_head = id(new PHUIHeaderView())
-      ->setHeader(pht('Method Result'));
 
     $method_uri = $this->getApplicationURI('method/'.$method.'/');
 
@@ -569,13 +570,11 @@ final class PhabricatorConduitAPIController
     return $this->buildApplicationPage(
       array(
         $crumbs,
-        $param_head,
-        $param_table,
-        $result_head,
-        $result_table,
+        $param_panel,
+        $result_panel,
       ),
       array(
-        'title' => 'Method Call Result',
+        'title' => pht('Method Call Result'),
       ));
   }
 

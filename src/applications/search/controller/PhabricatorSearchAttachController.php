@@ -74,7 +74,8 @@ final class PhabricatorSearchAttachController
         $txn_editor = $object->getApplicationTransactionEditor()
           ->setActor($user)
           ->setContentSourceFromRequest($request)
-          ->setContinueOnMissingFields(true);
+          ->setContinueOnMissingFields(true)
+          ->setContinueOnNoEffect(true);
 
         $txn_template = $object->getApplicationTransactionTemplate()
           ->setTransactionType(PhabricatorTransactions::TYPE_EDGE)
@@ -83,9 +84,14 @@ final class PhabricatorSearchAttachController
             '+' => array_fuse($add_phids),
             '-' => array_fuse($rem_phids),
           ));
-        $txn_editor->applyTransactions(
-          $object->getApplicationTransactionObject(),
-          array($txn_template));
+
+        try {
+          $txn_editor->applyTransactions(
+            $object->getApplicationTransactionObject(),
+            array($txn_template));
+        } catch (PhabricatorEdgeCycleException $ex) {
+          $this->raiseGraphCycleException($ex);
+        }
 
         return id(new AphrontReloadResponse())->setURI($handle->getURI());
       } else {

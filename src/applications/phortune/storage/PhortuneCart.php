@@ -16,6 +16,7 @@ final class PhortuneCart extends PhortuneDAO
   protected $accountPHID;
   protected $authorPHID;
   protected $merchantPHID;
+  protected $subscriptionPHID;
   protected $cartClass;
   protected $status;
   protected $metadata = array();
@@ -34,7 +35,9 @@ final class PhortuneCart extends PhortuneDAO
       ->setAuthorPHID($actor->getPHID())
       ->setStatus(self::STATUS_BUILDING)
       ->setAccountPHID($account->getPHID())
-      ->setMerchantPHID($merchant->getPHID());
+      ->attachAccount($account)
+      ->setMerchantPHID($merchant->getPHID())
+      ->attachMerchant($merchant);
 
     $cart->account = $account;
     $cart->purchases = array();
@@ -192,8 +195,8 @@ final class PhortuneCart extends PhortuneDAO
     // TODO: Perform purchase review. Here, we would apply rules to determine
     // whether the charge needs manual review (maybe making the decision via
     // Herald, configuration, or by examining provider fraud data). For now,
-    // always require review.
-    $needs_review = true;
+    // don't require review.
+    $needs_review = false;
 
     if ($needs_review) {
       $this->willReviewCart();
@@ -450,8 +453,13 @@ final class PhortuneCart extends PhortuneDAO
     return $this->getImplementation()->getCancelURI($this);
   }
 
-  public function getDetailURI() {
-    return '/phortune/cart/'.$this->getID().'/';
+  public function getDetailURI(PhortuneMerchant $authority = null) {
+    if ($authority) {
+      $prefix = 'merchant/'.$authority->getID().'/';
+    } else {
+      $prefix = '';
+    }
+    return '/phortune/'.$prefix.'cart/'.$this->getID().'/';
   }
 
   public function getCheckoutURI() {
@@ -508,7 +516,7 @@ final class PhortuneCart extends PhortuneDAO
     return $this->getImplementation()->assertCanRefundOrder($this);
   }
 
-  public function getConfiguration() {
+  protected function getConfiguration() {
     return array(
       self::CONFIG_AUX_PHID => true,
       self::CONFIG_SERIALIZATION => array(
@@ -518,6 +526,7 @@ final class PhortuneCart extends PhortuneDAO
         'status' => 'text32',
         'cartClass' => 'text128',
         'mailKey' => 'bytes20',
+        'subscriptionPHID' => 'phid?',
       ),
       self::CONFIG_KEY_SCHEMA => array(
         'key_account' => array(
@@ -525,6 +534,9 @@ final class PhortuneCart extends PhortuneDAO
         ),
         'key_merchant' => array(
           'columns' => array('merchantPHID'),
+        ),
+        'key_subscription' => array(
+          'columns' => array('subscriptionPHID'),
         ),
       ),
     ) + parent::getConfiguration();

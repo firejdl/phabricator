@@ -11,6 +11,14 @@ final class PhabricatorSyntaxHighlightingConfigOptions
     return pht('Options relating to syntax highlighting source code.');
   }
 
+  public function getFontIcon() {
+    return 'fa-code';
+  }
+
+  public function getGroup() {
+    return 'core';
+  }
+
   public function getOptions() {
 
     $caches_href = PhabricatorEnv::getDocLink('Managing Caches');
@@ -132,7 +140,7 @@ final class PhabricatorSyntaxHighlightingConfigOptions
       $this->newOption(
         'style.monospace',
         'string',
-        '10px "Menlo", "Consolas", "Monaco", monospace')
+        null)
         ->setLocked(true)
         ->setSummary(
           pht('Default monospace font.'))
@@ -143,7 +151,7 @@ final class PhabricatorSyntaxHighlightingConfigOptions
       $this->newOption(
         'style.monospace.windows',
         'string',
-        '11px "Menlo", "Consolas", "Monaco", monospace')
+        null)
         ->setLocked(true)
         ->setSummary(
           pht('Default monospace font for clients on Windows.'))

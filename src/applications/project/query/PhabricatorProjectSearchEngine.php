@@ -7,7 +7,7 @@ final class PhabricatorProjectSearchEngine
     return pht('Projects');
   }
 
-  protected function getApplicationClassName() {
+  public function getApplicationClassName() {
     return 'PhabricatorProjectApplication';
   }
 
@@ -219,29 +219,6 @@ final class PhabricatorProjectSearchEngine
 
     foreach ($projects as $key => $project) {
       $id = $project->getID();
-      $workboards_uri = $this->getApplicationURI("board/{$id}/");
-      $members_uri = $this->getApplicationURI("members/{$id}/");
-      $workboards_url = phutil_tag(
-        'a',
-        array(
-          'href' => $workboards_uri,
-        ),
-        pht('Workboard'));
-
-      $members_class = null;
-      $members_sigil = null;
-      if (!isset($can_edit_projects[$key])) {
-        $members_class = 'disabled';
-        $members_sigil = 'workflow';
-      }
-      $members_url = javelin_tag(
-        'a',
-        array(
-          'href' => $members_uri,
-          'class' => $members_class,
-          'sigil' => $members_sigil,
-        ),
-        pht('Members'));
 
       $tag_list = id(new PHUIHandleTagListView())
         ->setSlim(true)
@@ -251,9 +228,7 @@ final class PhabricatorProjectSearchEngine
         ->setHeader($project->getName())
         ->setHref($this->getApplicationURI("view/{$id}/"))
         ->setImageURI($project->getProfileImageURI())
-        ->addAttribute($tag_list)
-        ->addAttribute($workboards_url)
-        ->addAttribute($members_url);
+        ->addAttribute($tag_list);
 
       if ($project->getStatus() == PhabricatorProjectStatus::STATUS_ARCHIVED) {
         $item->addIcon('delete-grey', pht('Archived'));

@@ -16,6 +16,7 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
   private $pageObjects = array();
   private $applicationMenu;
   private $showFooter = true;
+  private $showDurableColumn = true;
 
   public function setShowFooter($show_footer) {
     $this->showFooter = $show_footer;
@@ -73,6 +74,15 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
     }
   }
 
+  public function setShowDurableColumn($show) {
+    $this->showDurableColumn = $show;
+    return $this;
+  }
+
+  public function getShowDurableColumn() {
+    return $this->showDurableColumn;
+  }
+
   public function getTitle() {
     $use_glyph = true;
 
@@ -123,6 +133,7 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
     require_celerity_resource('phui-form-css');
     require_celerity_resource('sprite-gradient-css');
     require_celerity_resource('phabricator-standard-page-view');
+    require_celerity_resource('conpherence-durable-column-view');
 
     Javelin::initBehavior('workflow', array());
 
@@ -259,18 +270,31 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
 
     $response = CelerityAPI::getStaticResourceResponse();
 
+    $font_css = null;
+    if (!empty($monospaced)) {
+      $font_css = hsprintf(
+        '<style type="text/css">'.
+        '.PhabricatorMonospaced, '.
+        '.phabricator-remarkup .remarkup-code-block '.
+          '.remarkup-code { font: %s !important; } '.
+        '</style>', $monospaced);
+    }
+
+    $font_css_win = null;
+    if (!empty($monospaced_win)) {
+      $font_css_win = hsprintf(
+        '<style type="text/css">'.
+        '.platform-windows .PhabricatorMonospaced, '.
+        '.platform-windows .phabricator-remarkup '.
+          '.remarkup-code-block .remarkup-code { font: %s !important; }'.
+        '</style>', $monospaced_win);
+    }
+
     return hsprintf(
-      '%s<style type="text/css">'.
-      '.PhabricatorMonospaced, '.
-      '.phabricator-remarkup .remarkup-code-block '.
-        '.remarkup-code { font: %s; } '.
-      '.platform-windows .PhabricatorMonospaced, '.
-      '.platform-windows .phabricator-remarkup '.
-        '.remarkup-code-block .remarkup-code { font: %s; }'.
-      '</style>%s',
+      '%s%s%s%s',
       parent::getHead(),
-      phutil_safe_html($monospaced),
-      phutil_safe_html($monospaced_win),
+      $font_css,
+      $font_css_win,
       $response->renderSingleResource('javelin-magical-init', 'phabricator'));
   }
 
@@ -301,8 +325,6 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
   }
 
   protected function getBody() {
-    $console = $this->getConsole();
-
     $user = null;
     $request = $this->getRequest();
     if ($request) {
@@ -327,7 +349,7 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
     // Render the "you have unresolved setup issues..." warning.
     $setup_warning = null;
     if ($user && $user->getIsAdmin()) {
-      $open = PhabricatorSetupCheck::getOpenSetupIssueCount();
+      $open = PhabricatorSetupCheck::getOpenSetupIssueKeys();
       if ($open) {
         $setup_warning = phutil_tag_div(
           'setup-warning-callout',
@@ -335,27 +357,62 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
             'a',
             array(
               'href' => '/config/issue/',
+              'title' => implode(', ', $open),
             ),
-            pht('You have %d unresolved setup issue(s)...', $open)));
+            pht('You have %d unresolved setup issue(s)...', count($open))));
       }
     }
 
-    return phutil_tag(
+    Javelin::initBehavior(
+      'scrollbar',
+      array(
+        'nodeID' => 'phabricator-standard-page',
+        'isMainContent' => true,
+      ));
+
+    $main_page = phutil_tag(
       'div',
       array(
-        'id' => 'base-page',
+        'id' => 'phabricator-standard-page',
         'class' => 'phabricator-standard-page',
       ),
       array(
         $developer_warning,
         $setup_warning,
         $header_chrome,
-        phutil_tag_div('phabricator-standard-page-body', array(
-          ($console ? hsprintf('<darkconsole />') : null),
-          parent::getBody(),
-          $this->renderFooter(),
-        )),
+        phutil_tag(
+          'div',
+          array(
+            'id' => 'phabricator-standard-page-body',
+            'class' => 'phabricator-standard-page-body',
+          ),
+          $this->renderPageBodyContent()),
       ));
+
+    $durable_column = null;
+    if ($this->getShowDurableColumn()) {
+      $durable_column = new ConpherenceDurableColumnView();
+    }
+
+    return phutil_tag(
+      'div',
+      array(
+        'class' => 'main-page-frame',
+      ),
+      array(
+        $main_page,
+        $durable_column,
+      ));
+  }
+
+  private function renderPageBodyContent() {
+    $console = $this->getConsole();
+
+    return array(
+      ($console ? hsprintf('<darkconsole />') : null),
+      parent::getBody(),
+      $this->renderFooter(),
+    );
   }
 
   protected function getTail() {
@@ -497,4 +554,15 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView {
       $foot);
   }
 
+  public function renderForQuicksand() {
+    // TODO: We could run a lighter version of this and skip some work. In
+    // particular, we end up including many redundant resources.
+    $this->willRenderPage();
+    $response = $this->renderPageBodyContent();
+    $response = $this->willSendResponse($response);
+
+    return array(
+      'content' => hsprintf('%s', $response),
+    );
+  }
 }

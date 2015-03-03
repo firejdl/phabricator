@@ -6,9 +6,8 @@ final class DiffusionTagListController extends DiffusionController {
     return true;
   }
 
-  public function processRequest() {
+  protected function processDiffusionRequest(AphrontRequest $request) {
     $drequest = $this->getDiffusionRequest();
-    $request = $this->getRequest();
     $viewer = $request->getUser();
 
     $repository = $drequest->getRepository();
@@ -29,16 +28,16 @@ final class DiffusionTagListController extends DiffusionController {
       $is_commit = false;
     }
 
-    $tags = array();
-    try {
-      $conduit_result = $this->callConduitWithDiffusionRequest(
-        'diffusion.tagsquery',
-        $params);
-      $tags = DiffusionRepositoryTag::newFromConduit($conduit_result);
-    } catch (ConduitException $ex) {
-      if ($ex->getMessage() != 'ERR-UNSUPPORTED-VCS') {
-        throw $ex;
-      }
+    switch ($repository->getVersionControlSystem()) {
+      case PhabricatorRepositoryType::REPOSITORY_TYPE_SVN:
+        $tags = array();
+        break;
+      default:
+        $conduit_result = $this->callConduitWithDiffusionRequest(
+          'diffusion.tagsquery',
+          $params);
+        $tags = DiffusionRepositoryTag::newFromConduit($conduit_result);
+        break;
     }
     $tags = $pager->sliceResults($tags);
 

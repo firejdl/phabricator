@@ -5,6 +5,12 @@ final class PhortuneCartSearchEngine
 
   private $merchant;
   private $account;
+  private $subscription;
+
+  public function canUseInPanelContext() {
+    // These only make sense in an account or merchant context.
+    return false;
+  }
 
   public function setAccount(PhortuneAccount $account) {
     $this->account = $account;
@@ -24,8 +30,21 @@ final class PhortuneCartSearchEngine
     return $this->merchant;
   }
 
+  public function setSubscription(PhortuneSubscription $subscription) {
+    $this->subscription = $subscription;
+    return $this;
+  }
+
+  public function getSubscription() {
+    return $this->subscription;
+  }
+
   public function getResultTypeDescription() {
     return pht('Phortune Orders');
+  }
+
+  public function getApplicationClassName() {
+    return 'PhabricatorPhortuneApplication';
   }
 
   public function buildSavedQueryFromRequest(AphrontRequest $request) {
@@ -81,6 +100,11 @@ final class PhortuneCartSearchEngine
       } else {
         throw new Exception(pht('You have no accounts!'));
       }
+    }
+
+    $subscription = $this->getSubscription();
+    if ($subscription) {
+      $query->withSubscriptionPHIDs(array($subscription->getPHID()));
     }
 
     return $query;
@@ -147,8 +171,21 @@ final class PhortuneCartSearchEngine
     foreach ($carts as $cart) {
       $merchant = $cart->getMerchant();
 
+      if ($this->getMerchant()) {
+        $href = $this->getApplicationURI(
+          'merchant/'.$merchant->getID().'/cart/'.$cart->getID().'/');
+      } else {
+        $href = $cart->getDetailURI();
+      }
+
       $rows[] = array(
         $cart->getID(),
+        phutil_tag(
+          'a',
+          array(
+            'href' => $href,
+          ),
+          $cart->getName()),
         $handles[$cart->getPHID()]->renderLink(),
         $handles[$merchant->getPHID()]->renderLink(),
         $handles[$cart->getAuthorPHID()]->renderLink(),
